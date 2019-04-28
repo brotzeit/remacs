@@ -18,10 +18,10 @@ use crate::{
     remacs_sys,
     remacs_sys::Vautoload_queue,
     remacs_sys::{
-        aset_multibyte_string, bool_vector_binop_driver, buffer_defaults, build_string, globals,
-        rust_count_one_bits, set_default_internal, set_internal, string_to_number,
-        symbol_trapped_write, valid_lisp_object_p, wrong_choice, wrong_range, CHAR_TABLE_SET,
-        CHECK_IMPURE,
+        aset_multibyte_string, bool_vector_binop_driver, buffer_defaults, build_string,
+        float_to_string, globals, make_unibyte_string, rust_count_one_bits, set_default_internal,
+        set_internal, string_to_number, symbol_trapped_write, valid_lisp_object_p, wrong_choice,
+        wrong_range, CHAR_TABLE_SET, CHECK_IMPURE,
     },
     remacs_sys::{per_buffer_default, symbol_redirect},
     remacs_sys::{pvec_type, BoolVectorOp, EmacsInt, Lisp_Misc_Type, Lisp_Type, Set_Internal_Bind},
@@ -32,8 +32,9 @@ use crate::{
         Qcondition_variable, Qcons, Qcyclic_function_indirection, Qdefalias_fset_function, Qdefun,
         Qfinalizer, Qfloat, Qfont, Qfont_entity, Qfont_object, Qfont_spec, Qframe,
         Qfunction_documentation, Qhash_table, Qinteger, Qmany, Qmarker, Qmodule_function, Qmutex,
-        Qnil, Qnone, Qoverlay, Qprocess, Qrange, Qstring, Qsubr, Qsymbol, Qterminal, Qthread,
-        Qunbound, Qunevalled, Quser_ptr, Qvector, Qwatchers, Qwindow, Qwindow_configuration,
+        Qnil, Qnone, Qnumberp, Qoverlay, Qprocess, Qrange, Qstring, Qsubr, Qsymbol, Qterminal,
+        Qthread, Qunbound, Qunevalled, Quser_ptr, Qvector, Qwatchers, Qwindow,
+        Qwindow_configuration,
     },
     symbols::LispSymbolRef,
     threads::ThreadState,
@@ -852,6 +853,31 @@ pub fn string_to_number_lisp(mut string: LispStringRef, base: Option<EmacsInt>) 
         Qnil => LispObject::from(0),
         n => n,
     }
+}
+
+pub const FLOAT_TO_STRING_BUFSIZE: c_int = 350;
+
+/// Return the decimal representation of NUMBER as a string.
+/// Uses a minus sign if negative.
+/// NUMBER may be an integer or a floating point number.
+#[lisp_fn]
+pub fn number_to_string(mut number: LispObject) -> LispObject {
+    // TODO: Remove when we implemented LispNumberOrMarker
+    // and make arg number a LispNumber
+    if !(number.is_integer() || number.is_float()) {
+        wrong_type!(Qnumberp, number);
+    }
+
+    let buffer = 
+    
+    let len = if number.is_float() {
+        unsafe { float_to_string(buffer, number.force_float()) }
+    } else {
+        let f = EmacsInt::from(number);
+        f.to_string()
+    };
+
+    unsafe { make_unibyte_string(buffer, len) }
 }
 
 include!(concat!(env!("OUT_DIR"), "/data_exports.rs"));

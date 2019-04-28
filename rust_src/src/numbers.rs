@@ -246,7 +246,6 @@ impl LispObject {
         self.is_fixnum() || self.is_float()
     }
 
-    /*
     pub fn as_number_or_error(self) -> LispNumber {
         if let Some(n) = self.as_fixnum() {
             LispNumber::Fixnum(n)
@@ -256,7 +255,6 @@ impl LispObject {
             wrong_type!(Qnumberp, self)
         }
     }
-    */
 
     pub fn as_number_coerce_marker(self) -> Option<LispNumber> {
         self.into()

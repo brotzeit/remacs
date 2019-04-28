@@ -1056,24 +1056,24 @@ cons_to_signed (Lisp_Object c, intmax_t min, intmax_t max)
   return val;
 }
 
-DEFUN ("number-to-string", Fnumber_to_string, Snumber_to_string, 1, 1, 0,
-       doc: /* Return the decimal representation of NUMBER as a string.
-Uses a minus sign if negative.
-NUMBER may be an integer or a floating point number.  */)
-  (Lisp_Object number)
-{
-  char buffer[max (FLOAT_TO_STRING_BUFSIZE, INT_BUFSIZE_BOUND (EMACS_INT))];
-  int len;
+/* DEFUN ("number-to-string", Fnumber_to_string, Snumber_to_string, 1, 1, 0, */
+/*        doc: /\* Return the decimal representation of NUMBER as a string. */
+/* Uses a minus sign if negative. */
+/* NUMBER may be an integer or a floating point number.  *\/) */
+/*   (Lisp_Object number) */
+/* { */
+/*   char buffer[max (FLOAT_TO_STRING_BUFSIZE, INT_BUFSIZE_BOUND (EMACS_INT))]; */
+/*   int len; */
 
-  CHECK_NUMBER_OR_FLOAT (number);
+/*   CHECK_NUMBER_OR_FLOAT (number); */
 
-  if (FLOATP (number))
-    len = float_to_string (buffer, XFLOAT_DATA (number));
-  else
-    len = sprintf (buffer, "%"pI"d", XINT (number));
+/*   if (FLOATP (number)) */
+/*     len = float_to_string (buffer, XFLOAT_DATA (number)); */
+/*   else */
+/*     len = sprintf (buffer, "%"pI"d", XINT (number)); */
 
-  return make_unibyte_string (buffer, len);
-}
+/*   return make_unibyte_string (buffer, len); */
+/* } */
 
 static Lisp_Object
 ash_lsh_impl (Lisp_Object value, Lisp_Object count, bool lsh)
@@ -1593,7 +1593,7 @@ syms_of_data (void)
   defsubr (&Sterminal_local_value);
   defsubr (&Sset_terminal_local_value);
 #endif
-  defsubr (&Snumber_to_string);
+  /* defsubr (&Snumber_to_string); */
   defsubr (&Slsh);
   defsubr (&Sash);
 #ifdef HAVE_MODULES
