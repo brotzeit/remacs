@@ -13,11 +13,33 @@ use crate::{
     lisp::LispObject,
     obarray::intern,
     remacs_sys::{
-        code_convert_string_norecord, del_range, looking_at_1, make_string, pvec_type,
-        send_process, vterminal, EmacsInt, Fforward_char, Fget_buffer_window, Flength,
-        Fline_end_position, Fput_text_property, Frecenter, Fselected_window, Fset, Lisp_Type,
-        Qbold, Qcursor_type, Qface, Qitalic, Qnil, Qnormal, Qt, Qutf_8, STRING_BYTES, Finsert
-            // ,Qvtermp
+        code_convert_string_norecord,
+        del_range,
+        looking_at_1,
+        make_string,
+        pvec_type,
+        send_process,
+        vterminal,
+        EmacsInt,
+        Fforward_char,
+        Fget_buffer_window,
+        Finsert, // ,Qvtermp
+        Flength,
+        Fline_end_position,
+        Fput_text_property,
+        Frecenter,
+        Fselected_window,
+        Fset,
+        Lisp_Type,
+        Qbold,
+        Qcursor_type,
+        Qface,
+        Qitalic,
+        Qnil,
+        Qnormal,
+        Qt,
+        Qutf_8,
+        STRING_BYTES,
     },
 
     remacs_sys::{
@@ -28,12 +50,12 @@ use crate::{
 
     // libvterm
     remacs_sys::{
-        vterm_color_is_equal,  vterm_input_write, vterm_keyboard_key,
-        vterm_keyboard_unichar, vterm_new, vterm_obtain_screen, vterm_obtain_state,
-        vterm_output_get_buffer_current, vterm_screen_enable_altscreen, vterm_screen_flush_damage,
-        vterm_screen_reset, vterm_screen_set_damage_merge, vterm_set_size, vterm_set_utf8,
-        vterm_state_get_cursorpos, VTermDamageSize, VTermKey, VTermModifier, VTermPos, VTermProp,
-        VTermRect, VTermScreenCell, VTermState, VTermValue,
+        vterm_color_is_equal, vterm_input_write, vterm_keyboard_key, vterm_keyboard_unichar,
+        vterm_new, vterm_obtain_screen, vterm_obtain_state, vterm_output_get_buffer_current,
+        vterm_screen_enable_altscreen, vterm_screen_flush_damage, vterm_screen_reset,
+        vterm_screen_set_damage_merge, vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos,
+        VTermDamageSize, VTermKey, VTermModifier, VTermPos, VTermProp, VTermRect, VTermScreenCell,
+        VTermState, VTermValue,
     },
 
     threads::ThreadState,
@@ -60,8 +82,7 @@ impl LispObject {
     }
 
     pub fn as_vterminal_or_error(self) -> LispVterminalRef {
-        self.as_vterminal()
-            .unwrap_or_else(|| wrong_type!(Qt, self))
+        self.as_vterminal().unwrap_or_else(|| wrong_type!(Qt, self))
     }
 }
 
@@ -192,7 +213,7 @@ unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i3
 
             if !compare_cells(&mut cell, &mut lastcell) {
                 let mut text = vterminal_render_text(vterm, v.as_mut_ptr(), length, &mut lastcell);
-                Finsert (1, &mut text);
+                Finsert(1, &mut text);
 
                 size -= length;
                 v = Vec::with_capacity(size as usize);
@@ -234,7 +255,7 @@ unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i3
     }
 
     let mut text = vterminal_render_text(vterm, v.as_mut_ptr(), length, &mut lastcell);
-    Finsert (1, &mut text);
+    Finsert(1, &mut text);
 }
 
 /// Refresh the screen (visible part of the buffer when the terminal is focused)
@@ -305,14 +326,14 @@ unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef, added: i32) {
     let window = Fget_buffer_window(term.buffer, Qt);
     let swindow = Fselected_window();
 
-    if window.eq(swindow) {
-        if following {
-            // "Follow" the terminal output
-            Frecenter(LispObject::from(-1));
-        } else {
-            Frecenter(LispObject::from(pos.row));
-        }
-    }
+    // if window.eq(swindow) {
+    //     if following {
+    //         // "Follow" the terminal output
+    //         Frecenter(LispObject::from(-1));
+    //     } else {
+    //         Frecenter(LispObject::from(pos.row));
+    //     }
+    // }
 }
 
 /// Refresh the scrollback of an invalidated terminal.
@@ -574,9 +595,11 @@ pub fn vterminal_delete_lines(linenum: EmacsInt, count: LispObject) {
     vterminal_goto_line(linenum);
 
     let start = cur_buf.pt;
-    unsafe {let end = EmacsInt::from(Fline_end_position(count)) as isize;
-    
-    del_range(start, end) };
+    unsafe {
+        let end = EmacsInt::from(Fline_end_position(count)) as isize;
+
+        del_range(start, end)
+    };
 
     let pos = cur_buf.pt;
     unsafe {
