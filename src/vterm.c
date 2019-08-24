@@ -53,8 +53,13 @@ static int vterminal_sb_push(int cols, const VTermScreenCell *cells, void *data)
     term->sb_current++;
   }
 
-  if (term->sb_pending < (int)term->sb_size) {
+  if (term->sb_pending < term->sb_size) {
     term->sb_pending++;
+    /* when window height decreased */
+    if (term->height_resize < 0 &&
+        term->sb_pending_by_height_decr < -term->height_resize) {
+      term->sb_pending_by_height_decr++;
+    }
   }
 
   memcpy(sbrow->cells, cells, sizeof(cells[0]) * c);
@@ -248,6 +253,92 @@ color_to_rgb_string(vterminal *term, VTermColor *color) {
            color->rgb.blue);
   return make_string(buffer, 7);
 
+}
+
+int
+osc_callback(const char *command, size_t cmdlen, void *user) {
+  vterminal *term = (vterminal *)user;
+  char buffer[cmdlen + 1];
+
+  buffer[cmdlen] = '\0';
+  memcpy(buffer, command, cmdlen);
+
+  if (cmdlen > 4 && buffer[0] == '5' && buffer[1] == '1' && buffer[2] == ';' &&
+      buffer[3] == 'A') {
+    if (term->directory != NULL) {
+      free(term->directory);
+      term->directory = NULL;
+    }
+    term->directory = malloc(cmdlen - 4 + 1);
+    strcpy(term->directory, &buffer[4]);
+    term->directory_changed = true;
+    return 1;
+  }
+  return 0;
+}
+
+VTermParserCallbacks parser_callbacks = {
+    .text = NULL,
+    .control = NULL,
+    .escape = NULL,
+    .csi = NULL,
+    .osc = &osc_callback,
+    .dcs = NULL,
+};
+
+void
+term_redraw_cursor(vterminal *term) {
+  if (term->cursor.cursor_type_changed) {
+    term->cursor.cursor_type_changed = false;
+    switch (term->cursor.cursor_type) {
+    case VTERM_PROP_CURSOR_VISIBLE:
+      Fset(Qcursor_type, Qt);
+      break;
+    case VTERM_PROP_CURSOR_NOT_VISIBLE:
+      Fset(Qcursor_type, Qnil);
+      break;
+    case VTERM_PROP_CURSOR_BLOCK:
+      Fset(Qcursor_type, Qbox);
+      break;
+    case VTERM_PROP_CURSOR_UNDERLINE:
+      Fset(Qcursor_type, Qhbar);
+      break;
+    case VTERM_PROP_CURSOR_BAR_LEFT:
+      Fset(Qcursor_type, Qbar);
+      break;
+    default:
+      return;
+    }
+  }
+}
+
+int
+vterminal_settermprop(VTermProp prop, VTermValue *val, void *user_data) {
+  vterminal *term = (vterminal *)user_data;
+  switch (prop) {
+  case VTERM_PROP_CURSORVISIBLE:
+    vterminal_invalidate_terminal(term, term->cursor.row, term->cursor.row + 1);
+    if (val->boolean) {
+      term->cursor.cursor_type = VTERM_PROP_CURSOR_VISIBLE;
+    } else {
+      term->cursor.cursor_type = VTERM_PROP_CURSOR_NOT_VISIBLE;
+    }
+    term->cursor.cursor_type_changed = true;
+    break;
+  case VTERM_PROP_CURSORSHAPE:
+    vterminal_invalidate_terminal(term, term->cursor.row, term->cursor.row + 1);
+    term->cursor.cursor_type = val->number;
+    term->cursor.cursor_type_changed = true;
+
+    break;
+  case VTERM_PROP_ALTSCREEN:
+    vterminal_invalidate_terminal(term, 0, term->height);
+    break;
+  default:
+    return 0;
+  }
+
+  return 1;
 }
 
 #endif
