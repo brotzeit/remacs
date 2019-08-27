@@ -1,3 +1,4 @@
+(require 'term)
 (require 'subr-x)
 (require 'cl-lib)
 (require 'color)
@@ -44,72 +45,64 @@ to the terminal anymore."
 (defface vterm-color-default
   `((t :inherit default))
   "The default normal color and bright color.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ANSI color 0 and the background
+color is used as ANSI color 7."
   :group 'vterm)
 
 (defface vterm-color-black
-  `((t :foreground ,(aref ansi-color-names-vector 0)
-       :background ,(aref ansi-color-names-vector 0)))
+  `((t :inherit term-color-black))
   "Face used to render black color code.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ANSI color 0 and the background
+color is used as ANSI color 8."
   :group 'vterm)
 
 (defface vterm-color-red
-  `((t :foreground ,(aref ansi-color-names-vector 1)
-       :background ,(aref ansi-color-names-vector 1)))
+  `((t :inherit term-color-red))
   "Face used to render red color code.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ANSI color 1 and the background
+color is used as ANSI color 9."
   :group 'vterm)
 
 (defface vterm-color-green
-  `((t :foreground ,(aref ansi-color-names-vector 2)
-       :background ,(aref ansi-color-names-vector 2)))
+  `((t :inherit term-color-green))
   "Face used to render green color code.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ANSI color 2 and the background
+color is used as ANSI color 10."
   :group 'vterm)
 
 (defface vterm-color-yellow
-  `((t :foreground ,(aref ansi-color-names-vector 3)
-       :background ,(aref ansi-color-names-vector 3)))
+  `((t :inherit term-color-yellow))
   "Face used to render yellow color code.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ANSI color 3 and the background
+color is used as ANSI color 11."
   :group 'vterm)
 
 (defface vterm-color-blue
-  `((t :foreground ,(aref ansi-color-names-vector 4)
-       :background ,(aref ansi-color-names-vector 4)))
+  `((t :inherit term-color-blue))
   "Face used to render blue color code.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ANSI color 4 and the background
+color is used as ANSI color 12."
   :group 'vterm)
 
 (defface vterm-color-magenta
-  `((t :foreground ,(aref ansi-color-names-vector 5)
-       :background ,(aref ansi-color-names-vector 5)))
+  `((t :inherit term-color-magenta))
   "Face used to render magenta color code.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ansi color 5 and the background
+color is used as ansi color 13."
   :group 'vterm)
 
 (defface vterm-color-cyan
-  `((t :foreground ,(aref ansi-color-names-vector 6)
-       :background ,(aref ansi-color-names-vector 6)))
+  `((t :inherit term-color-cyan))
   "Face used to render cyan color code.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ansi color 6 and the background
+color is used as ansi color 14."
   :group 'vterm)
 
 (defface vterm-color-white
-  `((t :foreground ,(aref ansi-color-names-vector 7)
-       :background ,(aref ansi-color-names-vector 7)))
+  `((t :inherit term-color-white))
   "Face used to render white color code.
-the foreground color are used for normal color,
-and background color are used for bright color. "
+The foreground color is used as ansi color 7 and the background
+color is used as ansi color 15."
   :group 'vterm)
 
 (defvar vterm-color-palette
