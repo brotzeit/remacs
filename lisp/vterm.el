@@ -138,21 +138,36 @@ Argument INDEX index of color."
 
 (defvar vterm-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map [tab]                       #'vterm-self-insert)
-    (define-key map [backspace]                 #'vterm-self-insert)
-    (define-key map [M-backspace]               #'vterm-self-insert)
-    (define-key map [return]                    #'vterm-self-insert)
-    (define-key map [left]                      #'vterm-self-insert)
-    (define-key map [right]                     #'vterm-self-insert)
-    (define-key map [up]                        #'vterm-self-insert)
-    (define-key map [down]                      #'vterm-self-insert)
+    (define-key map [tab]                       #'vterm-send-tab)
+    (define-key map (kbd "TAB")                 #'vterm-send-tab)
+    (define-key map [backtab]                   #'vterm-self-insert)
+    (define-key map [backspace]                 #'vterm-send-backspace)
+    (define-key map (kbd "DEL")                 #'vterm-send-backspace)
+    (define-key map [M-backspace]               #'vterm-send-meta-backspace)
+    (define-key map (kbd "M-DEL")               #'vterm-send-meta-backspace)
+    (define-key map [return]                    #'vterm-send-return)
+    (define-key map (kbd "RET")                 #'vterm-send-return)
+    (define-key map [left]                      #'vterm-send-left)
+    (define-key map [right]                     #'vterm-send-right)
+    (define-key map [up]                        #'vterm-send-up)
+    (define-key map [down]                      #'vterm-send-down)
+    (define-key map [prior]                     #'vterm-send-prior)
+    (define-key map [next]                      #'vterm-send-next)
     (define-key map [home]                      #'vterm-self-insert)
     (define-key map [end]                       #'vterm-self-insert)
     (define-key map [escape]                    #'vterm-self-insert)
-    (define-key map [remap self-insert-command] #'vterm-self-insert)
     (define-key map [remap yank]                #'vterm-yank)
+    (define-key map [remap yank-pop]            #'vterm-yank-pop)
+    (define-key map (kbd "C-SPC")               #'vterm-self-insert)
+    (define-key map (kbd "C-_")                 #'vterm-self-insert)
+    (define-key map (kbd "C-/")                 #'vterm-undo)
+    (define-key map (kbd "M-.")                 #'vterm-send-meta-dot)
+    (define-key map (kbd "M-,")                 #'vterm-send-meta-comma)
     (define-key map (kbd "C-c C-y")             #'vterm-self-insert)
     (define-key map (kbd "C-c C-c")             #'vterm-send-ctrl-c)
+    (define-key map [remap self-insert-command] #'vterm-self-insert)
+
+    (define-key map (kbd "C-c C-t")             #'vterm-copy-mode)
     map)
   "Keymap for `vterm-mode'.")
 
@@ -262,21 +277,114 @@ Feeds the size change to the virtual terminal."
         (setq key (upcase key)))
       (vterm-update vterm--term key shift meta ctrl))))
 
+
+(defun vterm-send-start ()
+  "Output from the system is started when the system receives START."
+  (interactive)
+  (vterm-send-key "<start>"))
+
+(defun vterm-send-stop ()
+  "Output from the system is stopped when the system receives STOP."
+  (interactive)
+  (vterm-send-key "<stop>"))
+
+(defun vterm-send-return ()
+  "Sends `<return>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<return>"))
+
+(defun vterm-send-tab ()
+  "Sends `<tab>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<tab>"))
+
+(defun vterm-send-backspace ()
+  "Sends `<backspace>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<backspace>"))
+
+(defun vterm-send-meta-backspace ()
+  "Sends `M-<backspace>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<backspace>" nil t))
+
+(defun vterm-send-up ()
+  "Sends `<up>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<up>"))
+
+(defun vterm-send-down ()
+  "Sends `<down>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<down>"))
+
+(defun vterm-send-left()
+  "Sends `<left>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<left>"))
+
+(defun vterm-send-right()
+  "Sends `<right>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<right>"))
+
+(defun vterm-send-prior()
+  "Sends `<prior>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<prior>"))
+
+(defun vterm-send-next()
+  "Sends `<next>' to the libvterm."
+  (interactive)
+  (vterm-send-key "<next>"))
+
+(defun vterm-send-meta-dot()
+  "Sends `M-.' to the libvterm."
+  (interactive)
+  (vterm-send-key "." nil t))
+
+(defun vterm-send-meta-comma()
+  "Sends `M-,' to the libvterm."
+  (interactive)
+  (vterm-send-key "," nil t))
+
 (defun vterm-send-ctrl-c ()
-  "Sends C-c to the libvterm."
+  "Sends `C-c' to the libvterm."
   (interactive)
   (vterm-send-key "c" nil nil t))
 
-(defun vterm-yank ()
-  "Implementation of `yank' (paste) in vterm."
+(defun vterm-undo ()
+  "Sends `C-_' to the libvterm."
   (interactive)
-  (vterm-send-string (current-kill 0)))
+  (vterm-send-key "_" nil nil t))
 
-(defun vterm-send-string (string)
-  "Send the string STRING to vterm."
+(defun vterm-yank (&optional arg)
+  "Implementation of `yank' (paste) in vterm."
+  (interactive "P")
+  (let ((inhibit-read-only t))
+    (cl-letf (((symbol-function 'insert-for-yank)
+               #'(lambda(str) (vterm-send-string str t))))
+      (yank arg))))
+
+(defun vterm-yank-pop(&optional arg)
+  "Implementation of `yank-pop' in vterm."
+  (interactive "p")
+  (let ((inhibit-read-only t)
+        (yank-undo-function #'(lambda(_start _end) (vterm-undo))))
+    (cl-letf (((symbol-function 'insert-for-yank)
+               #'(lambda(str) (vterm-send-string str t))))
+      (yank-pop arg))))
+
+(defun vterm-send-string (string &optional paste-p)
+  "Send the string STRING to vterm.
+Optional argument PASTE-P paste-p."
   (when vterm--term
+    (when paste-p
+      (vterm-update vterm--term "<start_paste>" nil nil nil))
     (dolist (char (string-to-list string))
-      (vterm-update vterm--term (char-to-string char) nil nil nil))))
+      (vterm-update vterm--term (char-to-string char) nil nil nil))
+    (when paste-p
+      (vterm-update vterm--term "<end_paste>" nil nil nil))))
 
 ;;;###autoload
 (defun vterm (&optional arg)
