@@ -245,20 +245,22 @@ Feeds the size change to the virtual terminal."
 (defun vterm-self-insert ()
   "Sends invoking key to libvterm."
   (interactive)
+  (when vterm--term
     (let* ((modifiers (event-modifiers last-input-event))
            (shift (memq 'shift modifiers))
            (meta (memq 'meta modifiers))
            (ctrl (memq 'control modifiers)))
       (when-let ((key (key-description (vector (event-basic-type last-input-event)))))
-        (vterm-send-key key shift meta ctrl))))
+        (vterm-send-key key shift meta ctrl)))))
 
 (defun vterm-send-key (key &optional shift meta ctrl)
   "Sends KEY to libvterm with optional modifiers SHIFT, META and CTRL."
+  (when vterm--term
     (let ((inhibit-redisplay t)
           (inhibit-read-only t))
-      (when (and shift (not meta) (not ctrl))
+      (when (and (not (symbolp last-input-event)) shift (not meta) (not ctrl))
         (setq key (upcase key)))
-      (vterm-update vterm--term key shift meta ctrl)))
+      (vterm-update vterm--term key shift meta ctrl))))
 
 (defun vterm-send-ctrl-c ()
   "Sends C-c to the libvterm."

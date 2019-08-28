@@ -50,12 +50,12 @@ use crate::{
 
     // libvterm
     remacs_sys::{
-        vterm_color_is_equal, vterm_input_write, vterm_keyboard_key, vterm_keyboard_unichar,
-        vterm_new, vterm_obtain_screen, vterm_obtain_state, vterm_output_get_buffer_current,
-        vterm_screen_enable_altscreen, vterm_screen_flush_damage, vterm_screen_reset,
-        vterm_screen_set_damage_merge, vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos,
-        VTermDamageSize, VTermKey, VTermModifier, VTermPos, VTermProp, VTermRect, VTermScreenCell,
-        VTermState, VTermValue,
+        vterm_color_is_equal, vterm_input_write, vterm_keyboard_end_paste, vterm_keyboard_key,
+        vterm_keyboard_start_paste, vterm_keyboard_unichar, vterm_new, vterm_obtain_screen,
+        vterm_obtain_state, vterm_output_get_buffer_current, vterm_screen_enable_altscreen,
+        vterm_screen_flush_damage, vterm_screen_reset, vterm_screen_set_damage_merge,
+        vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos, VTermDamageSize, VTermKey,
+        VTermModifier, VTermPos, VTermProp, VTermRect, VTermScreenCell, VTermState, VTermValue,
     },
 
     threads::ThreadState,
@@ -415,6 +415,10 @@ pub fn vterminal_update(
             if len > 1 && *(key.offset(0)) == 60 {
                 if is_key(key, "<return>".as_ptr() as *const c_char, len) {
                     vterm_keyboard_key((*vterm).vt, VTermKey::VTERM_KEY_ENTER, modifier);
+                } else if is_key(key, "<start_paste>".as_ptr() as *const c_char, len) {
+                    vterm_keyboard_start_paste((*vterm).vt);
+                } else if is_key(key, "<end_paste>".as_ptr() as *const c_char, len) {
+                    vterm_keyboard_end_paste((*vterm).vt);
                 } else if is_key(key, "<up>".as_ptr() as *const c_char, len) {
                     vterm_keyboard_key((*vterm).vt, VTermKey::VTERM_KEY_UP, modifier);
                 } else if is_key(key, "<down>".as_ptr() as *const c_char, len) {
