@@ -4849,36 +4849,19 @@ typedef struct vterminal {
 } vterminal;
 
 extern VTermScreenCallbacks vterm_screen_callbacks;
-
 extern int row_to_linenr(vterminal *term, int row);
-
 extern int vterminal_movecursor(VTermPos new, VTermPos old, int visible,
                            void *data);
-
 extern int vterminal_damage(VTermRect rect, void *data);
-
 extern int vterminal_moverect(VTermRect dest, VTermRect src, void *data);
-
 extern Lisp_Object color_to_rgb_string(vterminal *term, VTermColor *color);
-
 extern int vterminal_settermprop(VTermProp prop, VTermValue *val, void *user_data);
-
+extern size_t codepoint_to_utf8(const uint32_t codepoint, unsigned char buffer[4]);
 extern bool utf8_to_codepoint(const unsigned char buffer[4], const size_t len,
                               uint32_t *codepoint);
-
 extern int vterminal_resize (int rows, int cols, void *user_data);
-
 extern void fetch_cell(vterminal *, int , int , VTermScreenCell *);
-
 extern bool is_eol(vterminal *term, int end_col, int row, int col);
-
-extern size_t codepoint_to_utf8(const uint32_t codepoint, unsigned char buffer[4]);
-
-extern Lisp_Object mytest_color (VTermColor *color);
-
-extern bool mybitand (VTermColor *col, int s);
-
-extern bool mybitand2 (VTermColor *col);
 
 #endif
 
