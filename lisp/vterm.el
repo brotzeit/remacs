@@ -1,3 +1,5 @@
+;;; vterm.el --- This package implements a terminal via libvterm -*- lexical-binding: t; -*-
+
 (require 'term)
 (require 'subr-x)
 (require 'cl-lib)
@@ -171,6 +173,39 @@ Argument INDEX index of color."
     map)
   "Keymap for `vterm-mode'.")
 
+(defvar vterm-copy-mode-map (make-sparse-keymap)
+  "Minor mode map for `vterm-copy-mode'.")
+(define-key vterm-copy-mode-map (kbd "C-c C-t")        #'vterm-copy-mode)
+(define-key vterm-copy-mode-map [return]               #'vterm-copy-mode-done)
+(define-key vterm-copy-mode-map (kbd "RET")            #'vterm-copy-mode-done)
+
+(defvar-local vterm--copy-saved-point nil)
+
+(define-minor-mode vterm-copy-mode
+  "Toggle vterm copy mode."
+  :group 'vterm
+  :lighter " VTermCopy"
+  :keymap vterm-copy-mode-map
+  (if vterm-copy-mode
+      (progn                            ;enable vterm-copy-mode
+        (use-local-map nil)
+        (vterm-send-stop)
+        (setq vterm--copy-saved-point (point)))
+    (if vterm--copy-saved-point
+        (goto-char vterm--copy-saved-point))
+    (use-local-map vterm-mode-map)
+    (vterm-send-start)))
+
+(defun vterm-copy-mode-done ()
+  "Save the active region to the kill ring and exit `vterm-copy-mode'."
+  (interactive)
+  (unless vterm-copy-mode
+    (user-error "This command is effective only in vterm-copy-mode"))
+  (unless (region-active-p)
+    (user-error "No region is active"))
+  (kill-ring-save (region-beginning) (region-end))
+  (vterm-copy-mode -1))
+
 ;; Function keys and most of C- and M- bindings
 (defun vterm--exclude-keys (exceptions)
   (mapc (lambda (key)
@@ -254,7 +289,6 @@ Feeds the size change to the virtual terminal."
               (width (- (window-body-width window) 2))
               (inhibit-read-only t))
           (set-process-window-size vterm--process height width)
-          ;; (set-process-window-size (vterm-process vterm--term) height width)
           (vterm-set-size vterm--term height width))))))
 
 (defun vterm-self-insert ()
@@ -398,6 +432,22 @@ Optional argument PASTE-P paste-p."
         (vterm-mode)))
     (vterm-resize-window (selected-frame))
     (funcall vterm-display-method buffer)))
+
+(defun vterm--set-directory (path)
+  "Set `default-directory' to PATH."
+  (if (string-match "^\\(.*?\\)@\\(.*?\\):\\(.*?\\)$" path)
+      (progn
+        (let ((user (match-string 1 path))
+              (host (match-string 2 path))
+              (dir (match-string 3 path)))
+          (if (and (string-equal user user-login-name)
+                   (string-equal host (system-name)))
+              (progn
+                (when (file-directory-p dir)
+                  (setq default-directory dir)))
+            (setq default-directory (concat "/-:" path)))))
+    (when (file-directory-p path)
+      (setq default-directory path))))
 
 (provide 'vterm)
 ;;; vterm.el ends here

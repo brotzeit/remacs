@@ -13,33 +13,10 @@ use crate::{
     lisp::LispObject,
     obarray::intern,
     remacs_sys::{
-        code_convert_string_norecord,
-        del_range,
-        looking_at_1,
-        make_string,
-        pvec_type,
-        send_process,
-        vterminal,
-        EmacsInt,
-        Fforward_char,
-        Fget_buffer_window,
-        Finsert, // ,Qvtermp
-        Flength,
-        Fline_end_position,
-        Fput_text_property,
-        Frecenter,
-        Fselected_window,
-        Fset,
-        Lisp_Type,
-        Qbold,
-        Qcursor_type,
-        Qface,
-        Qitalic,
-        Qnil,
-        Qnormal,
-        Qt,
-        Qutf_8,
-        STRING_BYTES,
+        call1, code_convert_string_norecord, del_range, looking_at_1, make_string, pvec_type,
+        send_process, vterminal, EmacsInt, Fforward_char, Fget_buffer_window, Finsert, Flength,
+        Fline_end_position, Fput_text_property, Fselected_window, Fset, Lisp_Type, Qbold,
+        Qcursor_type, Qface, Qitalic, Qnil, Qnormal, Qt, Qterminal_live_p, Qutf_8, STRING_BYTES,
     },
 
     remacs_sys::{
@@ -82,7 +59,8 @@ impl LispObject {
     }
 
     pub fn as_vterminal_or_error(self) -> LispVterminalRef {
-        self.as_vterminal().unwrap_or_else(|| wrong_type!(Qt, self))
+        self.as_vterminal()
+            .unwrap_or_else(|| wrong_type!(Qterminal_live_p, self))
     }
 }
 
@@ -326,6 +304,8 @@ unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef, added: i32) {
     let window = Fget_buffer_window(term.buffer, Qt);
     let swindow = Fselected_window();
 
+    call1(intern("recenter"), LispObject::from(-1));
+    // Frecenter(LispObject::from(-1));
     // if window.eq(swindow) {
     //     if following {
     //         // "Follow" the terminal output
@@ -587,6 +567,9 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
 
         vterminal_adjust_topline(vterm, line_added);
     }
+
+    // if vterm.directory_changed {}
+
     vterm.is_invalidated = false;
 }
 
@@ -623,7 +606,7 @@ pub fn vterminal_count_lines() -> i32 {
 
     unsafe { set_point(cur_buf.beg()) };
 
-    let mut count: i32 = 0; // same as count-lines
+    let mut count: i32 = 0;
     let regexp = unsafe { make_string("\n".as_ptr() as *mut c_char, 1) };
     while unsafe { !search_command(regexp, Qnil, Qt, LispObject::from(1), 1, 0, false).is_nil() } {
         count += 1;
@@ -734,9 +717,10 @@ pub unsafe extern "C" fn vterminal_resize(
     1
 }
 
-#[no_mangle]
-pub extern "C" fn rust_syms_of_vterm() {
-    def_lisp_sym!(Qvtermp, "vtermp");
-}
+// TODO: Make this work again
+// #[no_mangle]
+// pub extern "C" fn rust_syms_of_vterm() {
+//     def_lisp_sym!(Qvtermp, "vtermp");
+// }
 
 include!(concat!(env!("OUT_DIR"), "/vterm_exports.rs"));
