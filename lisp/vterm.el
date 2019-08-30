@@ -311,7 +311,6 @@ Feeds the size change to the virtual terminal."
         (setq key (upcase key)))
       (vterm-update vterm--term key shift meta ctrl))))
 
-
 (defun vterm-send-start ()
   "Output from the system is started when the system receives START."
   (interactive)

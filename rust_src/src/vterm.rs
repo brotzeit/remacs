@@ -15,8 +15,9 @@ use crate::{
     remacs_sys::{
         call1, code_convert_string_norecord, del_range, looking_at_1, make_string, pvec_type,
         send_process, vterminal, EmacsInt, Fforward_char, Fget_buffer_window, Finsert, Flength,
-        Fline_end_position, Fput_text_property, Fselected_window, Fset, Lisp_Type, Qbold,
-        Qcursor_type, Qface, Qitalic, Qnil, Qnormal, Qt, Qterminal_live_p, Qutf_8, STRING_BYTES,
+        Fline_end_position, Fpoint, Fput_text_property, Fselected_window, Fset, Fset_window_point,
+        Lisp_Type, Qbold, Qcursor_type, Qface, Qitalic, Qnil, Qnormal, Qt, Qterminal_live_p,
+        Qutf_8, STRING_BYTES,
     },
 
     remacs_sys::{
@@ -304,16 +305,21 @@ unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef, added: i32) {
     let window = Fget_buffer_window(term.buffer, Qt);
     let swindow = Fselected_window();
 
-    call1(intern("recenter"), LispObject::from(-1));
-    // Frecenter(LispObject::from(-1));
-    // if window.eq(swindow) {
-    //     if following {
-    //         // "Follow" the terminal output
-    //         Frecenter(LispObject::from(-1));
-    //     } else {
-    //         Frecenter(LispObject::from(pos.row));
-    //     }
-    // }
+    if window.eq(swindow) {
+        if following {
+            // "Follow" the terminal output
+            call1(LispObject::from(intern("recenter")), LispObject::from(-1));
+        } else {
+            call1(
+                LispObject::from(intern("recenter")),
+                LispObject::from(pos.row),
+            );
+        }
+    } else {
+        if !window.is_nil() {
+            Fset_window_point(window, Fpoint());
+        }
+    }
 }
 
 /// Refresh the scrollback of an invalidated terminal.
@@ -568,66 +574,68 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
         vterminal_adjust_topline(vterm, line_added);
     }
 
-    // if vterm.directory_changed {}
-
     vterm.is_invalidated = false;
 }
 
 /// Delete COUNT lines starting from LINENUM.
 #[lisp_fn]
 pub fn vterminal_delete_lines(linenum: EmacsInt, count: LispObject) {
-    let mut cur_buf = ThreadState::current_buffer_unchecked();
-    let orig_pt = cur_buf.pt;
-
-    vterminal_goto_line(linenum);
-
-    let start = cur_buf.pt;
     unsafe {
+        let mut cur_buf = ThreadState::current_buffer_unchecked();
+        let orig_pt = cur_buf.pt;
+
+        vterminal_goto_line(linenum);
+
+        let start = cur_buf.pt;
+
         let end = EmacsInt::from(Fline_end_position(count)) as isize;
 
-        del_range(start, end)
-    };
+        del_range(start, end);
 
-    let pos = cur_buf.pt;
-    unsafe {
+        let pos = cur_buf.pt;
+
         if !looking_at_1(make_string("\n".as_ptr() as *mut c_char, 1), false).is_nil() {
             del_range(pos, pos + 1);
         }
-    }
 
-    unsafe { set_point(cmp::min(orig_pt, cur_buf.zv)) };
+        set_point(cmp::min(orig_pt, cur_buf.zv))
+    };
 }
 
 /// Count lines in current buffer.
 #[lisp_fn]
 pub fn vterminal_count_lines() -> i32 {
-    let cur_buf = ThreadState::current_buffer_unchecked();
-    let orig_pt = cur_buf.pt;
+    unsafe {
+        let cur_buf = ThreadState::current_buffer_unchecked();
+        let orig_pt = cur_buf.pt;
 
-    unsafe { set_point(cur_buf.beg()) };
+        set_point(cur_buf.beg());
 
-    let mut count: i32 = 0;
-    let regexp = unsafe { make_string("\n".as_ptr() as *mut c_char, 1) };
-    while unsafe { !search_command(regexp, Qnil, Qt, LispObject::from(1), 1, 0, false).is_nil() } {
-        count += 1;
+        let mut count: i32 = 0;
+        let regexp = make_string("\n".as_ptr() as *mut c_char, 1);
+        while !search_command(regexp, Qnil, Qt, LispObject::from(1), 1, 0, false).is_nil() {
+            count += 1;
+        }
+
+        if !(cur_buf.pt == cur_buf.begv || cur_buf.fetch_byte(cur_buf.pt_byte - 1) == b'\n') {
+            count += 1;
+        }
+
+        set_point(orig_pt);
+
+        count
     }
-
-    if !(cur_buf.pt == cur_buf.begv || cur_buf.fetch_byte(cur_buf.pt_byte - 1) == b'\n') {
-        count += 1;
-    }
-
-    unsafe { set_point(orig_pt) };
-
-    count
 }
 
 #[lisp_fn]
 pub fn vterminal_goto_line(line: EmacsInt) {
-    unsafe { set_point(1) };
+    unsafe {
+        set_point(1);
 
-    let regexp = unsafe { make_string("\n".as_ptr() as *mut c_char, 1) };
+        let regexp = make_string("\n".as_ptr() as *mut c_char, 1);
 
-    unsafe { search_command(regexp, Qnil, Qt, LispObject::from(line - 1), 1, 0, false) };
+        search_command(regexp, Qnil, Qt, LispObject::from(line - 1), 1, 0, false)
+    };
 }
 
 // vterm_screen_callbacks
