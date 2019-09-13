@@ -255,4 +255,35 @@ color_to_rgb_string(vterminal *term, VTermColor *color) {
 
 }
 
+int
+osc_callback(const char *command, size_t cmdlen, void *user) {
+  vterminal *term = (vterminal *)user;
+  char buffer[cmdlen + 1];
+
+  buffer[cmdlen] = '\0';
+  memcpy(buffer, command, cmdlen);
+
+  if (cmdlen > 4 && buffer[0] == '5' && buffer[1] == '1' && buffer[2] == ';' &&
+      buffer[3] == 'A') {
+    if (term->directory != NULL) {
+      free(term->directory);
+      term->directory = NULL;
+    }
+    term->directory = malloc(cmdlen - 4 + 1);
+    strcpy(term->directory, &buffer[4]);
+    term->directory_changed = true;
+    return 1;
+  }
+  return 0;
+}
+
+VTermParserCallbacks parser_callbacks = {
+    .text = NULL,
+    .control = NULL,
+    .escape = NULL,
+    .csi = NULL,
+    .osc = &osc_callback,
+    .dcs = NULL,
+};
+
 #endif

@@ -4836,6 +4836,8 @@ typedef struct vterminal {
   // window height has increased) and must be deleted from the terminal buffer
   int sb_pending;
   int sb_pending_by_height_decr;
+  long linenum;
+  long linenum_added;
 
   int invalid_start, invalid_end; // invalid rows in libvterm screen
   bool is_invalidated;
@@ -4844,13 +4846,15 @@ typedef struct vterminal {
   char *title;
   bool is_title_changed;
 
-  bool pending_resize;
+  char *directory;
+  bool directory_changed;
 
   int width, height;
   int height_resize;
   
 } vterminal;
 
+extern VTermParserCallbacks parser_callbacks;
 extern VTermScreenCallbacks vterm_screen_callbacks;
 extern int row_to_linenr(vterminal *term, int row);
 extern int vterminal_movecursor(VTermPos new, VTermPos old, int visible,

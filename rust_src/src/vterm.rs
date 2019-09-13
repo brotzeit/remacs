@@ -2,7 +2,7 @@
 
 use remacs_macros::lisp_fn;
 
-use libc::{c_char, c_uchar, c_void, size_t};
+use libc::{c_char, c_uchar, c_void, size_t, strlen};
 
 use std::{cmp, mem};
 
@@ -23,7 +23,7 @@ use crate::{
     remacs_sys::{
         codepoint_to_utf8, fetch_cell, is_eol, row_to_linenr, search_command, set_point,
         utf8_to_codepoint, vterm_output_read, vterm_screen_callbacks, vterm_screen_set_callbacks,
-        VtermScrollbackLine,
+        VtermScrollbackLine,parser_callbacks, 
     },
 
     // libvterm
@@ -34,6 +34,7 @@ use crate::{
         vterm_screen_flush_damage, vterm_screen_reset, vterm_screen_set_damage_merge,
         vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos, VTermDamageSize, VTermKey,
         VTermModifier, VTermPos, VTermProp, VTermRect, VTermScreenCell, VTermState, VTermValue,
+        vterm_state_set_unrecognised_fallbacks
     },
 
     threads::ThreadState,
@@ -120,6 +121,10 @@ pub fn vterminal_new_lisp(
         (*term).vt = vterm_new(rows as i32, cols as i32);
         vterm_set_utf8((*term).vt, 1);
         (*term).vts = vterm_obtain_screen((*term).vt);
+
+        let state: *mut VTermState = vterm_obtain_state(( *term).vt);
+        vterm_state_set_unrecognised_fallbacks(state, &parser_callbacks, term.as_mut () as *mut libc::c_void);
+        
         vterm_screen_reset((*term).vts, 1);
 
         vterm_screen_set_callbacks(
@@ -149,6 +154,9 @@ pub fn vterminal_new_lisp(
 
         (*term).buffer = LispObject::from(ThreadState::current_buffer_unchecked());
         (*term).process = process;
+
+        (*term).directory = std::mem::zeroed();
+        (*term).directory_changed = false;
 
         term
     }
@@ -572,6 +580,12 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
         let line_added = vterminal_count_lines() - bufline_before;
 
         vterminal_adjust_topline(vterm, line_added);
+    }
+
+    if (*vterm).directory_changed {
+        let dir = make_string(( * vterm).directory, strlen (( * vterm).directory) as isize);
+        call1 (LispObject::from(intern("vterm-set-directory")), dir);
+            
     }
 
     vterm.is_invalidated = false;

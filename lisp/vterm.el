@@ -432,7 +432,7 @@ Optional argument PASTE-P paste-p."
     (vterm-resize-window (selected-frame))
     (funcall vterm-display-method buffer)))
 
-(defun vterm--set-directory (path)
+(defun vterm-set-directory (path)
   "Set `default-directory' to PATH."
   (if (string-match "^\\(.*?\\)@\\(.*?\\):\\(.*?\\)$" path)
       (progn
