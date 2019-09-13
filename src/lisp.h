@@ -4835,6 +4835,7 @@ typedef struct vterminal {
   // it actually points to entries that are no longer in sb_buffer (because the
   // window height has increased) and must be deleted from the terminal buffer
   int sb_pending;
+  int sb_pending_by_height_decr;
 
   int invalid_start, invalid_end; // invalid rows in libvterm screen
   bool is_invalidated;
@@ -4846,6 +4847,8 @@ typedef struct vterminal {
   bool pending_resize;
 
   int width, height;
+  int height_resize;
+  
 } vterminal;
 
 extern VTermScreenCallbacks vterm_screen_callbacks;

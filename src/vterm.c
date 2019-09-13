@@ -53,8 +53,13 @@ static int vterminal_sb_push(int cols, const VTermScreenCell *cells, void *data)
     term->sb_current++;
   }
 
-  if (term->sb_pending < (int)term->sb_size) {
+  if (term->sb_pending < term->sb_size) {
     term->sb_pending++;
+    /* when window height decreased */
+    if (term->height_resize < 0 &&
+        term->sb_pending_by_height_decr < -term->height_resize) {
+      term->sb_pending_by_height_decr++;
+    }
   }
 
   memcpy(sbrow->cells, cells, sizeof(cells[0]) * c);
