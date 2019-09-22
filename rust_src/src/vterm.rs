@@ -252,14 +252,20 @@ unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
     (*term).invalid_end = cmp::min((*term).invalid_end, (*term).height);
 
     if (*term).invalid_end >= (*term).invalid_start {
-        let line_start = row_to_linenr(term.as_mut() as *mut vterminal, (*term).invalid_start);
 
-        vterminal_goto_line(line_start as EmacsInt);
+    if (*term).invalid_end >= (*term).invalid_start {
+        // let line_start = row_to_linenr(term.as_mut() as *mut vterminal, (*term).invalid_start);
+        let startrow = -((*term).height - (*term).invalid_start - (*term).linenum_added)
+    /* startrow is negative,so we backward  -startrow lines from end of buffer
+       then delete lines there.
+         */
+            
+        vterminal_goto_line(startrow as EmacsInt);
 
-        let line_count = (*term).invalid_end - (*term).invalid_start;
+        // let line_count = (*term).invalid_end - (*term).invalid_start;
         vterminal_delete_lines(
-            line_start as EmacsInt,
-            LispObject::from(line_count as EmacsInt),
+            startrow as EmacsInt,
+            LispObject::from((*term).invalid_end - (*term).invalid_start as EmacsInt),
         );
 
         refresh_lines(
@@ -268,7 +274,11 @@ unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
             (*term).invalid_end,
             (*term).width,
         );
+
+        /* term->linenum_added is lines added  by window height increased */
+        ( * term) - linenum += ( * term).linenum_added;
     }
+        
     (*term).invalid_start = std::i32::MAX;
     (*term).invalid_end = -1;
 }

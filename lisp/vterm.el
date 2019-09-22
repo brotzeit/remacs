@@ -285,8 +285,8 @@ Feeds the size change to the virtual terminal."
   (dolist (window (window-list frame))
     (with-current-buffer (window-buffer window)
       (when vterm--term
-        (let ((height (- (window-body-height window) 1))
-              (width (- (window-body-width window) 2))
+        (let ((height (window-body-height window))
+              (width (window-body-width window))
               (inhibit-read-only t))
           (set-process-window-size vterm--process height width)
           (vterm-set-size vterm--term height width))))))
