@@ -36,8 +36,8 @@ to the terminal anymore."
   :type '(repeat string)
   :set (lambda (sym val)
          (set sym val)
-         (when (fboundp 'vterm--exclude-keys)
-           (vterm--exclude-keys val)))
+         (when (fboundp 'vterm-exclude-keys)
+           (vterm-exclude-keys val)))
   :group 'vterm)
 
 (defvar vterm--term nil
@@ -207,12 +207,12 @@ Argument INDEX index of color."
   (vterm-copy-mode -1))
 
 ;; Function keys and most of C- and M- bindings
-(defun vterm--exclude-keys (exceptions)
+(defun vterm-exclude-keys (exceptions)
   (mapc (lambda (key)
           (define-key vterm-mode-map (kbd key) nil))
         exceptions)
   (mapc (lambda (key)
-          (define-key vterm-mode-map (kbd key) #'vterm--self-insert))
+          (define-key vterm-mode-map (kbd key) #'vterm-self-insert))
         (append (cl-loop for number from 1 to 12
                          for key = (format "<f%i>" number)
                          unless (member key exceptions)
@@ -223,7 +223,7 @@ Argument INDEX index of color."
                                          unless (member key exceptions)
                                          collect key)))))
 
-(vterm--exclude-keys vterm-keymap-exceptions)
+(vterm-exclude-keys vterm-keymap-exceptions)
 
 (defvar-local vterm--process nil
   "Shell process of current term.")
@@ -273,7 +273,7 @@ Then triggers a redraw from the module."
       (vterm-write-input vterm--term output)
       (vterm-update vterm--term))))
 
-(defun vterm-sentinel (proc string)
+(defun vterm-sentinel (proc _output)
   (let ((buf (process-buffer proc)))
     (when (buffer-live-p buf)
       (kill-buffer buf))))

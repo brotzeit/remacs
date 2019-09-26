@@ -291,7 +291,8 @@ fn run_bindgen(path: &str) {
                 .rustified_enum("symbol_redirect")
                 .rustified_enum("syntaxcode")
                 .rustified_enum("VTermProp")
-                .rustified_enum("VTermColorType");
+                .rustified_enum("VTermColorType")
+                .rustified_enum("VTERM_PROP_CURSOR");
 
             if cfg!(target_os = "windows") {
                 builder = builder
