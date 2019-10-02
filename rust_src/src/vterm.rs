@@ -23,7 +23,7 @@ use crate::{
     remacs_sys::{
         codepoint_to_utf8, fetch_cell, is_eol, row_to_linenr, search_command, set_point,
         utf8_to_codepoint, vterm_output_read, vterm_screen_callbacks, vterm_screen_set_callbacks,
-        VtermScrollbackLine,parser_callbacks, 
+        VtermScrollbackLine,parser_callbacks, term_redraw_cursor
     },
 
     // libvterm
@@ -147,7 +147,6 @@ pub fn vterminal_new_lisp(
         (*term).invalid_start = 0;
         (*term).invalid_end = rows as i32;
 
-        (*term).cursor.visible = true;
 
         (*term).width = cols as i32;
         (*term).height = rows as i32;
@@ -565,13 +564,9 @@ pub fn vterminal_set_size_lisp(vterm: LispVterminalRef, rows: EmacsInt, cols: Em
 /// Refresh cursor, scrollback and screen.
 /// Also adjust the top line.
 unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
+    term_redraw_cursor(vterm.as_mut());
+    
     if vterm.is_invalidated {
-        if (*vterm).cursor.visible {
-            Fset(Qcursor_type, Qt);
-        } else {
-            Fset(Qcursor_type, Qnil);
-        }
-
         let bufline_before = vterminal_count_lines();
 
         vterminal_refresh_scrollback(vterm);
@@ -653,26 +648,6 @@ pub fn vterminal_goto_line(line: EmacsInt) {
 }
 
 // vterm_screen_callbacks
-
-#[no_mangle]
-pub unsafe extern "C" fn vterminal_settermprop(
-    prop: VTermProp,
-    val: *mut VTermValue,
-    user_data: *mut c_void,
-) -> i32 {
-    let term = user_data as *mut vterminal;
-
-    match prop {
-        VTermProp::VTERM_PROP_ALTSCREEN => vterminal_invalidate_terminal(term, 0, (*term).height),
-        VTermProp::VTERM_PROP_CURSORVISIBLE => {
-            vterminal_invalidate_terminal(term, (*term).cursor.row, (*term).cursor.row + 1);
-            (*term).cursor.visible = (*val).boolean != 0;
-        }
-        _ => return 0,
-    }
-
-    1
-}
 
 #[no_mangle]
 pub unsafe extern "C" fn vterminal_invalidate_terminal(

@@ -4811,9 +4811,17 @@ typedef struct VtermScrollbackLine {
 
 typedef struct VtermCursor {
   int row, col;
-  bool blinking;
-  bool visible;
+  int cursor_type;
+  bool cursor_type_changed;
 } VtermCursor;
+
+enum VTERM_PROP_CURSOR {
+  VTERM_PROP_CURSOR_BLOCK = VTERM_PROP_CURSORSHAPE_BLOCK,
+  VTERM_PROP_CURSOR_UNDERLINE = VTERM_PROP_CURSORSHAPE_UNDERLINE,
+  VTERM_PROP_CURSOR_BAR_LEFT = VTERM_PROP_CURSORSHAPE_BAR_LEFT,
+  VTERM_PROP_CURSOR_VISIBLE = 4,
+  VTERM_PROP_CURSOR_NOT_VISIBLE = 5,
+};
 
 typedef struct vterminal {
   /* This is for Lisp; the terminal code does not refer to it.  */
@@ -4869,7 +4877,8 @@ extern bool utf8_to_codepoint(const unsigned char buffer[4], const size_t len,
 extern int vterminal_resize (int rows, int cols, void *user_data);
 extern void fetch_cell(vterminal *, int , int , VTermScreenCell *);
 extern bool is_eol(vterminal *term, int end_col, int row, int col);
-
+extern void term_redraw_cursor(vterminal *term);
+extern int term_settermprop(VTermProp prop, VTermValue *val, void *user_data);
 #endif
 
 INLINE_HEADER_END

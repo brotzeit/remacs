@@ -286,4 +286,59 @@ VTermParserCallbacks parser_callbacks = {
     .dcs = NULL,
 };
 
+void
+term_redraw_cursor(vterminal *term) {
+  if (term->cursor.cursor_type_changed) {
+    term->cursor.cursor_type_changed = false;
+    switch (term->cursor.cursor_type) {
+    case VTERM_PROP_CURSOR_VISIBLE:
+      Fset(Qcursor_type, Qt);
+      break;
+    case VTERM_PROP_CURSOR_NOT_VISIBLE:
+      Fset(Qcursor_type, Qnil);
+      break;
+    case VTERM_PROP_CURSOR_BLOCK:
+      Fset(Qcursor_type, Qbox);
+      break;
+    case VTERM_PROP_CURSOR_UNDERLINE:
+      Fset(Qcursor_type, Qhbar);
+      break;
+    case VTERM_PROP_CURSOR_BAR_LEFT:
+      Fset(Qcursor_type, Qbar);
+      break;
+    default:
+      return;
+    }
+  }
+}
+
+int
+vterminal_settermprop(VTermProp prop, VTermValue *val, void *user_data) {
+  vterminal *term = (vterminal *)user_data;
+  switch (prop) {
+  case VTERM_PROP_CURSORVISIBLE:
+    vterminal_invalidate_terminal(term, term->cursor.row, term->cursor.row + 1);
+    if (val->boolean) {
+      term->cursor.cursor_type = VTERM_PROP_CURSOR_VISIBLE;
+    } else {
+      term->cursor.cursor_type = VTERM_PROP_CURSOR_NOT_VISIBLE;
+    }
+    term->cursor.cursor_type_changed = true;
+    break;
+  case VTERM_PROP_CURSORSHAPE:
+    vterminal_invalidate_terminal(term, term->cursor.row, term->cursor.row + 1);
+    term->cursor.cursor_type = val->number;
+    term->cursor.cursor_type_changed = true;
+
+    break;
+  case VTERM_PROP_ALTSCREEN:
+    vterminal_invalidate_terminal(term, 0, term->height);
+    break;
+  default:
+    return 0;
+  }
+
+  return 1;
+}
+
 #endif
