@@ -1195,14 +1195,14 @@
 	 window-width zerop))
       (side-effect-and-error-free-fns
        '(arrayp atom
-	 bobp bolp bool-vector-p
+	 bignump bobp bolp bool-vector-p
 	 buffer-end buffer-list buffer-size buffer-string bufferp
 	 car-safe case-table-p cdr-safe char-or-string-p characterp
 	 charsetp commandp cons consp
 	 current-buffer current-global-map current-indentation
 	 current-local-map current-minor-mode-maps current-time
 	 eobp eolp eq equal eventp
-	 floatp following-char framep
+	 fixnump floatp following-char framep
 	 get-largest-window get-lru-window
 	 hash-table-p
 	 identity ignore integerp integer-or-marker-p interactive-p
@@ -1283,7 +1283,7 @@
 		  (setq bytedecomp-ptr (1+ bytedecomp-ptr))
 		  (+ (aref bytes bytedecomp-ptr)
 		     (progn (setq bytedecomp-ptr (1+ bytedecomp-ptr))
-			    (lsh (aref bytes bytedecomp-ptr) 8))))
+			    (ash (aref bytes bytedecomp-ptr) 8))))
 		 (t tem))))		;Offset was in opcode.
 	((>= bytedecomp-op byte-constant)
 	 (prog1 (- bytedecomp-op byte-constant)	;Offset in opcode.
@@ -1297,7 +1297,7 @@
 	 (setq bytedecomp-ptr (1+ bytedecomp-ptr))
 	 (+ (aref bytes bytedecomp-ptr)
 	    (progn (setq bytedecomp-ptr (1+ bytedecomp-ptr))
-		   (lsh (aref bytes bytedecomp-ptr) 8))))
+		   (ash (aref bytes bytedecomp-ptr) 8))))
 	((and (>= bytedecomp-op byte-listN)
 	      (<= bytedecomp-op byte-discardN))
 	 (setq bytedecomp-ptr (1+ bytedecomp-ptr)) ;Offset in next byte.

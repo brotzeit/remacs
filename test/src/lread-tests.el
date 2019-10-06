@@ -195,9 +195,7 @@ literals (Bug#20852)."
     (should (eq x (cdr x)))))
 
 (ert-deftest lread-long-hex-integer ()
-  (should-error
-   (read "#xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-   :type 'overflow-error))
+  (should (bignump (read "#xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))))
 
 (ert-deftest lread-test-bug-31186 ()
   (with-temp-buffer
@@ -210,5 +208,14 @@ literals (Bug#20852)."
 (ert-deftest lread-invalid-bytecodes ()
   (should-error
    (let ((load-force-doc-strings t)) (read "#[0 \"\"]"))))
+
+(ert-deftest lread-string-to-number-trailing-dot ()
+  (dolist (n (list (* most-negative-fixnum most-negative-fixnum)
+                   (1- most-negative-fixnum) most-negative-fixnum
+                   (1+ most-negative-fixnum) -1 0 1
+                   (1- most-positive-fixnum) most-positive-fixnum
+                   (1+ most-positive-fixnum)
+                   (* most-positive-fixnum most-positive-fixnum)))
+    (should (= n (string-to-number (format "%d." n))))))
 
 ;;; lread-tests.el ends here

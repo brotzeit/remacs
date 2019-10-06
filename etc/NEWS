@@ -24,12 +24,25 @@ When you add a new item, use the appropriate mark if you are sure it applies,
 
 * Installation Changes in Emacs 27.1
 
+** Emacs now uses GMP, the GNU Multiple Precision library.
+By default, if 'configure' does not find a suitable libgmp, it
+arranges for the included mini-gmp library to be built and used.
+The new 'configure' option --without-libgmp uses mini-gmp even if a
+suitable libgmp is available.
+
 ** The new configure option '--with-json' adds support for JSON using
 the Jansson library.  It is on by default; use 'configure
 --with-json=no' to build without Jansson support.  The new JSON
 functions 'json-serialize', 'json-insert', 'json-parse-string', and
 'json-parse-buffer' are typically much faster than their Lisp
 counterparts from json.el.
+
+** The etags program now uses the C library's regular expression matcher
+when possible, and a compatible regex substitute otherwise.  This will
+let developers maintain Emacs's own regex code without having to also
+support other programs.  The new configure option '--without-included-regex'
+forces etags to use the C library's regex matcher even if the regex
+substitute ordinarily would be used to work around compatibility problems.
 
 ** Emacs has been ported to the -fcheck-pointer-bounds option of GCC.
 This causes Emacs to check bounds of some arrays addressed by its
@@ -45,6 +58,18 @@ catch typos and support -fcheck-pointer-bounds.  The 'configure'
 option --enable-check-lisp-object-type is therefore no longer as
 useful and so is no longer enabled by default in developer builds,
 to reduce differences between developer and production builds.
+
+** Ibuffer
+
+---
+*** New toggle 'ibuffer-do-toggle-lock', bound to 'L'.
+
+** Gnus
+
++++
+*** The nnimap backend now has support for IMAP namespaces.
+This feature can be enabled by setting the new 'nnimap-use-namespaces'
+server variable to non-nil.
 
 
 * Startup Changes in Emacs 27.1
@@ -182,6 +207,11 @@ from a remote host.
 This triggers to search the program on the remote host as indicated by
 'default-directory'.
 
++++
+** New variable 'auto-save-no-message'.
+When set to t, no message will be shown when auto-saving (default
+value: nil).
+
 
 * Editing Changes in Emacs 27.1
 
@@ -242,10 +272,10 @@ previous behavior of always creating a buffer that visits a ChangeLog
 file.
 
 ** diff-mode
-*** Hunks are now automatically refined by default
+*** Hunks are now automatically refined by default.
 To disable it, set the new defcustom 'diff-font-lock-refine' to nil.
 
-*** File headers can be shortened, mimicking Magit's diff format
+*** File headers can be shortened, mimicking Magit's diff format.
 To enable it, set the new defcustom 'diff-font-lock-prettify to t.
 
 ** Browse-url
@@ -257,7 +287,7 @@ shown in the currently selected window.
 ** Comint
 
 +++
-*** 'send-invisible' is now an obsolete alias for `comint-send-invisible'
+*** 'send-invisible' is now an obsolete alias for `comint-send-invisible'.
 Also, 'shell-strip-ctrl-m' is declared obsolete.
 
 +++
@@ -285,20 +315,20 @@ end.
 ** Flymake
 
 +++
-*** The variable 'flymake-diagnostic-types-alist' is obsolete
+*** The variable 'flymake-diagnostic-types-alist' is obsolete.
 You should instead set properties on known diagnostic symbols, like
 ':error' and ':warning', as demonstrated in the Flymake manual.
 
-*** New customizable variable 'flymake-start-on-save-buffer'
+*** New customizable variable 'flymake-start-on-save-buffer'.
 Control whether Flymake starts checking the buffer on save.
 
-*** Flymake and backend functions may exchange hints about buffer changes
+*** Flymake and backend functions may exchange hints about buffer changes.
 This enables more efficient backends.  See the docstring of
 'flymake-diagnostic-functions' or the Flymake manual for details.
 
 ** Package
 
-*** New 'package-quickstart' feature
+*** New 'package-quickstart' feature.
 When 'package-quickstart' is non-nil, package.el precomputes a big autoloads
 file so that activation of packages can be done much faster, which can speed up
 your startup significantly.
@@ -329,13 +359,13 @@ mouse click event, and is intended to be bound to a mouse event.
 *** The ecomplete sorting has changed to a decay-based algorithm.
 This can be controlled by the new 'ecomplete-sort-predicate' variable.
 
-*** The 'ecompleterc' file is now placed in ~/.emacs.d/ecompleterc by default
+*** The 'ecompleterc' file is now placed in ~/.emacs.d/ecompleterc by default.
 Of course it will still find it if you have it in ~/.ecompleterc
 
 ** Gnus
 
 +++
-*** A prefix argument to 'gnus-summary-limit-to-score' will limit reverse
+*** A prefix argument to 'gnus-summary-limit-to-score' will limit reverse.
 Limit to articles with score at below.
 
 *** The function 'gnus-score-find-favorite-words' has been renamed
@@ -346,8 +376,8 @@ from 'gnus-score-find-favourite-words'.
 has a search engine.
 
 +++
-*** Splitting mail on common mailing list headers has been added.  See
-the concept index in the Gnus manual for the 'match-list' entry.
+*** Splitting mail on common mailing list headers has been added.
+See the concept index in the Gnus manual for the 'match-list' entry.
 
 +++
 *** nil is no longer an allowed value for 'mm-text-html-renderer'.
@@ -363,6 +393,10 @@ buffer with the article(s) attached.
 ---
 *** 'erc-button-google-url' has been renamed 'erc-button-search-url'
 and its value has been changed to Duck Duck Go.
+
+** EUDC
+
+*** XEmacs support has been removed.
 
 ** eww/shr
 
@@ -387,6 +421,7 @@ saved with the charset properties, and those properties will be
 restored when the file is visited.
 
 ** Smtpmail
+
 Authentication mechanisms can be added via external packages, by
 defining new cl-defmethod of smtpmail-try-auth-method.
 
@@ -680,6 +715,19 @@ to signal the main thread, e.g., when they encounter an error.
 +++
 *** 'thread-join' returns the result of the finished thread now.
 
+---
+** thingatpt.el supports a new "thing" called 'uuid'.
+A symbol 'uuid' can be passed to thing-at-point and it returns the
+UUID at point.
+
+
+** Interactive automatic highlighting
+
++++
+*** 'highlight-regexp' can now highlight subexpressions.
+The now command accepts a prefix numeric argument to choose the
+subexpression.
+
 
 * New Modes and Packages in Emacs 27.1
 
@@ -725,6 +773,7 @@ The variable 'custom--inhibit-theme-enable' controls this behavior;
 its default value changed in Emacs 27.1.
 
 ** The 'repetitions' argument of 'benchmark-run' can now also be a variable.
+
 ** The FILENAME argument to 'file-name-base' is now mandatory and no
 longer defaults to 'buffer-file-name'.
 
@@ -735,9 +784,10 @@ them through 'format' first.  Even that is discouraged: for ElDoc
 support, you should set 'eldoc-documentation-function' instead of
 calling 'eldoc-message' directly.
 
-** Old-style backquotes now generate an error.  They have been
-generating warnings for a decade.  To interpret old-style backquotes
-as new-style, bind the new variable 'force-new-style-backquotes' to t.
+** Old-style backquotes now generate an error.
+They have been generating warnings for a decade.  To interpret
+old-style backquotes as new-style, bind the new variable
+'force-new-style-backquotes' to t.
 
 ** Defining a Common Lisp structure using 'cl-defstruct' or
 'cl-struct-define' whose name clashes with a builtin type (e.g.,
@@ -746,15 +796,6 @@ as new-style, bind the new variable 'force-new-style-backquotes' to t.
 ** When formatting a floating-point number as an octal or hexadecimal
 integer, Emacs now signals an error if the number is too large for the
 implementation to format.
-
-+++
-** The Lisp reader now signals an overflow for plain decimal integers
-that do not end in '.' and are outside Emacs range.  Formerly the Lisp
-reader silently converted them to floating-point numbers, and signaled
-overflow only for integers with a radix that are outside machine range.
-To get the old behavior, set the new, experimental variable
-read-integer-overflow-as-float to t and please email
-30408@debbugs.gnu.org if you need that.
 
 ---
 ** Some functions and variables obsolete since Emacs 22 have been removed:
@@ -804,6 +845,12 @@ is backwards-compatible with versions of Emacs in which the old function
 exists.  See the node "Displaying Buffers in Side Windows" in the ELisp
 manual for more details.
 
+** garbage collection no longer treats miscellaneous objects specially;
+they are now allocated like any other pseudovector.  As a result, the
+'garbage-collect' and 'memory-use-count' functions no longer return a
+'misc' component, and the 'misc-objects-consed' variable has been
+removed.
+
 
 * Lisp Changes in Emacs 27.1
 
@@ -813,7 +860,27 @@ Given a proper list as argument, this predicate returns its length;
 otherwise, it returns nil.  'format-proper-list-p' is now an obsolete
 alias for the new function.
 
-** define-minor-mode automatically documents the meaning of ARG
++++
+** Emacs Lisp integers can now be of arbitrary size.
+Emacs uses the GNU Multiple Precision (GMP) library to support
+integers whose size is too large to support natively.  The integers
+supported natively are known as "fixnums", while the larger ones are
+"bignums".  The new predicates 'bignump' and 'fixnump' can be used to
+distinguish between these two types of integers.
+
+All the arithmetic, comparison, and logical (a.k.a. "bitwise")
+operations where bignums make sense now support both fixnums and
+bignums.  However, note that unlike fixnums, bignums will not compare
+equal with 'eq', you must use 'eql' instead.  (Numerical comparison
+with '=' works on both, of course.)
+
+Since large bignums consume a lot of memory, Emacs limits the size of
+the largest bignum a Lisp program is allowed to create.  The
+nonnegative value of the new variable 'integer-width' specifies the
+maximum number of bits allowed in a bignum.  Emacs signals an integer
+overflow error if this limit is exceeded.
+
+** define-minor-mode automatically documents the meaning of ARG.
 
 +++
 ** The function 'recenter' now accepts an additional optional argument.
@@ -968,10 +1035,6 @@ higher-level functions.
 *** image-mode started using ImageMagick by default for all images
 some years back.  It now respects 'imagemagick-types-inhibit' as a way
 to disable that.
-
-+++
-** The new function 'read-answer' accepts either long or short answers
-depending on the new customizable variable 'read-answer-short'.
 
 ** The function 'load' now behaves correctly when loading modules.
 Specifically, it puts the module name into 'load-history', prints

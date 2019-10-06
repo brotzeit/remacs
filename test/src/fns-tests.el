@@ -604,4 +604,45 @@
   (should (equal 1 (string-distance "ab" "a我b")))
   (should (equal 1 (string-distance "我" "她"))))
 
+(ert-deftest test-bignum-eql ()
+  "Test that `eql' works for bignums."
+  (let ((x (+ most-positive-fixnum 1))
+        (y (+ most-positive-fixnum 1)))
+    (should (eq x x))
+    (should (eql x y))
+    (should (equal x y))
+    (should-not (eql x 0.0e+NaN))))
+
+(ert-deftest test-bignum-hash ()
+  "Test that hash tables work for bignums."
+  ;; Make two bignums that are eql but not eq.
+  (let ((b1 (1+ most-positive-fixnum))
+        (b2 (1+ most-positive-fixnum)))
+    (dolist (test '(eq eql equal))
+      (let ((hash (make-hash-table :test test)))
+        (puthash b1 t hash)
+        (should (eq (gethash b2 hash)
+                    (funcall test b1 b2)))))))
+
+(ert-deftest test-nthcdr-simple ()
+  (should (eq (nthcdr 0 'x) 'x))
+  (should (eq (nthcdr 1 '(x . y)) 'y))
+  (should (eq (nthcdr 2 '(x y . z)) 'z)))
+
+(ert-deftest test-nthcdr-circular ()
+  (dolist (len '(1 2 5 37 120 997 1024))
+    (let ((cycle (make-list len nil)))
+      (setcdr (last cycle) cycle)
+      (dolist (n (list (1- most-negative-fixnum) most-negative-fixnum
+                       -1 0 1
+                       (1- len) len (1+ len)
+                       most-positive-fixnum (1+ most-positive-fixnum)
+                       (* 2 most-positive-fixnum)
+                       (* most-positive-fixnum most-positive-fixnum)
+                       (ash 1 12345)))
+        (let ((a (nthcdr n cycle))
+              (b (if (<= n 0) cycle (nthcdr (mod n len) cycle))))
+          (should (equal (list (eq a b) n len)
+                         (list t n len))))))))
+
 (provide 'fns-tests)

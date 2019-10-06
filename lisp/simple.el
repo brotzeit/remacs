@@ -6019,7 +6019,7 @@ into account variable-width characters and line continuation.
 If nil, `line-move' moves point by logical lines.
 A non-nil setting of `goal-column' overrides the value of this variable
 and forces movement by logical lines.
-A window that is  horizontally scrolled also forces movement by logical
+A window that is horizontally scrolled also forces movement by logical
 lines."
   :type 'boolean
   :group 'editing-basics
@@ -8348,16 +8348,16 @@ PREFIX is the string that represents this modifier in an event type symbol."
       (cond ((eq symbol 'control)
 	     (if (<= 64 (upcase event) 95)
 		 (- (upcase event) 64)
-	       (logior (lsh 1 lshiftby) event)))
+	       (logior (ash 1 lshiftby) event)))
 	    ((eq symbol 'shift)
              ;; FIXME: Should we also apply this "upcase" behavior of shift
              ;; to non-ascii letters?
 	     (if (and (<= (downcase event) ?z)
 		      (>= (downcase event) ?a))
 		 (upcase event)
-	       (logior (lsh 1 lshiftby) event)))
+	       (logior (ash 1 lshiftby) event)))
 	    (t
-	     (logior (lsh 1 lshiftby) event)))
+	     (logior (ash 1 lshiftby) event)))
     (if (memq symbol (event-modifiers event))
 	event
       (let ((event-type (if (symbolp event) event (car event))))

@@ -911,7 +911,7 @@ non-ASCII files.  This attribute is meaningful only when
 		(i 0))
 	    (dolist (elt coding-system-iso-2022-flags)
 	      (if (memq elt flags)
-		  (setq bits (logior bits (lsh 1 i))))
+		  (setq bits (logior bits (ash 1 i))))
 	      (setq i (1+ i)))
 	    (setcdr (assq :flags spec-attrs) bits))))
 
@@ -2545,7 +2545,17 @@ This function is intended to be added to `auto-coding-functions'."
       (let* ((match (match-string 2))
 	     (sym (intern (downcase match))))
 	(if (coding-system-p sym)
-	    sym
+            ;; If the encoding tag is UTF-8 and the buffer's
+            ;; encoding is one of the variants of UTF-8, use the
+            ;; buffer's encoding.  This allows, e.g., saving an
+            ;; HTML file as UTF-8 with BOM when the tag says UTF-8.
+            (let ((sym-type (coding-system-type sym))
+                  (bfcs-type
+                   (coding-system-type buffer-file-coding-system)))
+              (if (and (coding-system-equal 'utf-8 sym-type)
+                       (coding-system-equal 'utf-8 bfcs-type))
+                  buffer-file-coding-system
+		sym))
 	  (message "Warning: unknown coding system \"%s\"" match)
 	  nil)))))
 
