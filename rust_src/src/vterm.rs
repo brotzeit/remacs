@@ -157,6 +157,21 @@ pub fn vterminal_new_lisp(
     }
 }
 
+impl VTermScreenCellRef {
+    pub unsafe fn compare(mut self, mut other:  VTermScreenCellRef) -> bool {
+        let self_attr = (*self).attrs;
+        let other_attr = (*other).attrs;
+
+        vterm_color_is_equal(&mut (*self).fg, &mut (*other).fg) > 0
+            && vterm_color_is_equal(&mut (*self).bg, &mut (*other).bg) > 0
+            && (self_attr.bold() == other_attr.bold())
+            && (self_attr.underline() == other_attr.underline())
+            && (self_attr.italic() == other_attr.italic())
+            && (self_attr.reverse() == other_attr.reverse())
+            && (self_attr.strike() == other_attr.strike())
+    }
+}
+
 unsafe fn compare_cells(a: *mut VTermScreenCell, b: *mut VTermScreenCell) -> bool {
     let a_attr = (*a).attrs;
     let b_attr = (*b).attrs;
@@ -183,12 +198,12 @@ impl LispVterminalRef {
         }
     }
 
-    pub fn fetch_cell(mut self, row: i32, col: i32) -> VTermScreenCell {
-        unsafe {
+    pub unsafe fn fetch_cell(mut self, row: i32, col: i32) -> VTermScreenCell {
+
             let mut cell: VTermScreenCell = std::mem::zeroed();
-            fetch_cell(self.as_mut(), row, col, &mut cell);
+            fetch_cell(self.as_mut (), row, col, &mut cell);
             cell
-        }
+
     }
 }
 
@@ -197,7 +212,7 @@ unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i3
     let mut v: Vec<c_char> = Vec::with_capacity(size as usize);
 
     let mut cell: VTermScreenCell = std::mem::zeroed();
-    let mut lastcell = vterm.fetch_cell(start_row, 0);
+    let mut lastcell: VTermScreenCell = vterm.fetch_cell(start_row, 0);
 
     let mut length = 0;
     let mut offset = 0;
@@ -209,7 +224,13 @@ unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i3
             cell = vterm.fetch_cell(i, j);
 
             if !compare_cells(&mut cell, &mut lastcell) {
-                let mut text = vterminal_render_text(vterm, v.as_mut_ptr(), length, &mut lastcell);
+            // if !cell.compare(lastcell) {
+                let mut text = vterminal_render_text(
+                    vterm,
+                    v.as_mut_ptr(),
+                    length,
+                    &mut lastcell, 
+                );
                 Finsert(1, &mut text);
 
                 size -= length;
@@ -251,7 +272,12 @@ unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i3
         i += 1;
     }
 
-    let mut text = vterminal_render_text(vterm, v.as_mut_ptr(), length, &mut lastcell);
+    let mut text = vterminal_render_text(
+        vterm,
+        v.as_mut_ptr(),
+        length,
+        &mut lastcell, 
+    );
     Finsert(1, &mut text);
 }
 
