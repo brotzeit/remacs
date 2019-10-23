@@ -21,9 +21,9 @@ use crate::{
     },
 
     remacs_sys::{
-        codepoint_to_utf8, fetch_cell, is_eol, row_to_linenr, search_command, set_point,
-        utf8_to_codepoint, vterm_output_read, vterm_screen_callbacks, vterm_screen_set_callbacks,
-        VtermScrollbackLine,parser_callbacks, term_redraw_cursor
+        codepoint_to_utf8, fetch_cell, is_eol, parser_callbacks, row_to_linenr, search_command,
+        set_point, term_redraw_cursor, utf8_to_codepoint, vterm_output_read,
+        vterm_screen_callbacks, vterm_screen_set_callbacks, VtermScrollbackLine,
     },
 
     // libvterm
@@ -32,23 +32,16 @@ use crate::{
         vterm_keyboard_start_paste, vterm_keyboard_unichar, vterm_new, vterm_obtain_screen,
         vterm_obtain_state, vterm_output_get_buffer_current, vterm_screen_enable_altscreen,
         vterm_screen_flush_damage, vterm_screen_reset, vterm_screen_set_damage_merge,
-        vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos, VTermDamageSize, VTermKey,
-        VTermModifier, VTermPos, VTermProp, VTermRect, VTermScreenCell, VTermState, VTermValue,
-        vterm_state_set_unrecognised_fallbacks
+        vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos,
+        vterm_state_set_unrecognised_fallbacks, VTermDamageSize, VTermKey, VTermModifier, VTermPos,
+        VTermProp, VTermRect, VTermScreenCell, VTermState, VTermValue,
     },
 
     threads::ThreadState,
 };
 
 pub type LispVterminalRef = ExternalPtr<vterminal>;
-
-impl LispVterminalRef {
-    pub fn set_size(self, rows: i32, cols: i32) {
-        unsafe {
-            vterm_set_size((*self).vt, rows, cols);
-        }
-    }
-}
+pub type VTermScreenCellRef = ExternalPtr<VTermScreenCell>;
 
 impl LispObject {
     pub fn is_vterminal(self) -> bool {
@@ -122,9 +115,13 @@ pub fn vterminal_new_lisp(
         vterm_set_utf8((*term).vt, 1);
         (*term).vts = vterm_obtain_screen((*term).vt);
 
-        let state: *mut VTermState = vterm_obtain_state(( *term).vt);
-        vterm_state_set_unrecognised_fallbacks(state, &parser_callbacks, term.as_mut () as *mut libc::c_void);
-        
+        let state: *mut VTermState = vterm_obtain_state((*term).vt);
+        vterm_state_set_unrecognised_fallbacks(
+            state,
+            &parser_callbacks,
+            term.as_mut() as *mut libc::c_void,
+        );
+
         vterm_screen_reset((*term).vts, 1);
 
         vterm_screen_set_callbacks(
@@ -146,7 +143,6 @@ pub fn vterminal_new_lisp(
 
         (*term).invalid_start = 0;
         (*term).invalid_end = rows as i32;
-
 
         (*term).width = cols as i32;
         (*term).height = rows as i32;
@@ -180,13 +176,30 @@ pub fn vterminal_process(vterm: LispVterminalRef) -> LispObject {
     (*vterm).process
 }
 
+impl LispVterminalRef {
+    pub fn set_size(self, rows: i32, cols: i32) {
+        unsafe {
+            vterm_set_size((*self).vt, rows, cols);
+        }
+    }
+
+    pub fn fetch_cell(mut self, row: i32, col: i32) -> VTermScreenCell {
+        unsafe {
+            let mut cell: VTermScreenCell = std::mem::zeroed();
+            fetch_cell(self.as_mut(), row, col, &mut cell);
+            cell
+        }
+    }
+}
+
 unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i32, end_col: i32) {
     let mut size = ((end_row - start_row + 1) * end_col) * 4;
     let mut v: Vec<c_char> = Vec::with_capacity(size as usize);
 
     let mut cell: VTermScreenCell = std::mem::zeroed();
-    let mut lastcell: VTermScreenCell = std::mem::zeroed();
-    fetch_cell(vterm.as_mut(), start_row, 0, &mut lastcell);
+    // let mut lastcell: VTermScreenCell = std::mem::zeroed();
+    // fetch_cell(vterm.as_mut(), start_row, 0, &mut lastcell);
+    let mut lastcell = vterm.fetch_cell(start_row, 0);
 
     let mut length = 0;
     let mut offset = 0;
@@ -565,7 +578,7 @@ pub fn vterminal_set_size_lisp(vterm: LispVterminalRef, rows: EmacsInt, cols: Em
 /// Also adjust the top line.
 unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
     term_redraw_cursor(vterm.as_mut());
-    
+
     if vterm.is_invalidated {
         let bufline_before = vterminal_count_lines();
 
@@ -578,9 +591,8 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
     }
 
     if (*vterm).directory_changed {
-        let dir = make_string(( * vterm).directory, strlen (( * vterm).directory) as isize);
-        call1 (LispObject::from(intern("vterm-set-directory")), dir);
-            
+        let dir = make_string((*vterm).directory, strlen((*vterm).directory) as isize);
+        call1(LispObject::from(intern("vterm-set-directory")), dir);
     }
 
     vterm.is_invalidated = false;
