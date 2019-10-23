@@ -24,7 +24,7 @@
 use crate::{
     lisp::LispObject,
     remacs_sys::{
-        EmacsInt, EmacsUint, Lisp_Bits, Lisp_Type, Qintegerp, EMACS_INT_MAX, INTMASK, USE_LSB_TAG,
+        EmacsInt, EmacsUint, Lisp_Bits, Lisp_Type, Qintegerp, EMACS_INT_MAX, INTMASK, USE_LSB_TAG,Qwholenump, 
     },
 };
 
@@ -85,7 +85,7 @@ impl LispObject {
     }
 }
 
-// impl LispObject {
+impl LispObject {
 //     /// Convert a positive integer into its LispObject representation.
 //     ///
 //     /// This is also the function to use when translating `XSETFASTINT`
@@ -98,23 +98,23 @@ impl LispObject {
 //         Self::from_fixnum_truncated(n as EmacsInt)
 //     }
 
-//     pub fn is_natnum(self) -> bool {
-//         self.as_fixnum().map_or(false, |i| i >= 0)
-//     }
+    pub fn is_natnum(self) -> bool {
+        self.as_fixnum().map_or(false, |i| i >= 0)
+    }
 
-//     pub fn as_natnum(self) -> Option<EmacsUint> {
-//         if self.is_natnum() {
-//             Some(unsafe { self.to_fixnum_unchecked() as EmacsUint })
-//         } else {
-//             None
-//         }
-//     }
+    pub fn as_natnum(self) -> Option<EmacsUint> {
+        if self.is_natnum() {
+            Some(unsafe { self.to_fixnum_unchecked() as EmacsUint })
+        } else {
+            None
+        }
+    }
 
-//     pub fn as_natnum_or_error(self) -> EmacsUint {
-//         self.as_natnum()
-//             .unwrap_or_else(|| wrong_type!(Qwholenump, self))
-//     }
-// }
+    pub fn as_natnum_or_error(self) -> EmacsUint {
+        self.as_natnum()
+            .unwrap_or_else(|| wrong_type!(Qwholenump, self))
+    }
+}
 
 impl LispObject {
     //     pub fn int_or_float_from_fixnum(n: EmacsInt) -> Self {

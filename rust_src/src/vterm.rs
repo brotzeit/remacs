@@ -133,7 +133,6 @@ impl LispVterminalRef {
                 cell = self.fetch_cell(i, j);
 
                 if !compare_cells(&mut cell, &mut lastcell) {
-                    // if !cell.compare(lastcell) {
                     let mut text =
                         vterminal_render_text(self, v.as_mut_ptr(), length, &mut lastcell);
                     Finsert(1, &mut text);
@@ -208,15 +207,15 @@ fn allocate_vterm() -> LispVterminalRef {
 /// in VTermScreenCallbacks.
 #[lisp_fn(name = "vterm-new")]
 pub fn vterminal_new_lisp(
-    rows: EmacsInt,
-    cols: EmacsInt,
+    rows: i32,
+    cols: i32,
     process: LispObject,
     scrollback: EmacsInt,
 ) -> LispVterminalRef {
     unsafe {
         let mut term = allocate_vterm();
 
-        (*term).vt = vterm_new(rows as i32, cols as i32);
+        (*term).vt = vterm_new(rows, cols);
         vterm_set_utf8((*term).vt, 1);
         (*term).vts = vterm_obtain_screen((*term).vt);
 
@@ -233,9 +232,9 @@ pub fn vterminal_new_lisp(
         (*term).sb_current = 0;
         (*term).sb_pending = 0;
         (*term).invalid_start = 0;
-        (*term).invalid_end = rows as i32;
-        (*term).width = cols as i32;
-        (*term).height = rows as i32;
+        (*term).invalid_end = rows;
+        (*term).width = cols;
+        (*term).height = rows;
         (*term).buffer = LispObject::from(ThreadState::current_buffer_unchecked());
         (*term).process = process;
         (*term).directory = std::mem::zeroed();
@@ -563,10 +562,10 @@ pub fn vterminal_write_input(vterm: LispVterminalRef, string: LispObject) {
 
 /// Change size of VTERM according to ROWS and COLS.
 #[lisp_fn(name = "vterm-set-size")]
-pub fn vterminal_set_size_lisp(vterm: LispVterminalRef, rows: EmacsInt, cols: EmacsInt) {
+pub fn vterminal_set_size_lisp(vterm: LispVterminalRef, rows: i32, cols: i32) {
     unsafe {
-        if cols as i32 != (*vterm).width || rows as i32 != (*vterm).height {
-            vterm.set_size(rows as i32, cols as i32);
+        if cols != (*vterm).width || rows != (*vterm).height {
+            vterm.set_size(rows, cols);
             vterm_screen_flush_damage((*vterm).vts);
             vterminal_redraw(vterm);
         }
