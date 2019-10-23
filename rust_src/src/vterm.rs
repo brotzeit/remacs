@@ -77,110 +77,33 @@ impl From<LispObject> for Option<LispVterminalRef> {
     }
 }
 
-macro_rules! allocate_zeroed_pseudovector {
-    ($ty: ty, $field: ident, $vectype: expr) => {
-        unsafe {
-            crate::remacs_sys::allocate_pseudovector(
-                vecsize!($ty) as ::libc::c_int,
-                pseudovecsize!($ty, $field) as ::libc::c_int,
-                vecsize!($ty) as ::libc::c_int,
-                $vectype,
-            ) as *mut $ty
-        }
-    };
-}
+impl LispVterminalRef {
+    pub unsafe fn set_callbacks(mut self) {
+        vterm_screen_set_callbacks(
+            (*self).vts,
+            &vterm_screen_callbacks,
+            self.as_mut() as *mut libc::c_void,
+        );
 
-fn allocate_vterm() -> LispVterminalRef {
-    let v: *mut vterminal = allocate_zeroed_pseudovector!(vterminal, vt, pvec_type::PVEC_VTERMINAL);
-    LispVterminalRef::from_ptr(v as *mut c_void).unwrap()
-}
-
-/// Start a libvterm terminal-emulator in a new buffer.
-/// The maximum scrollback is set by the argument SCROLLBACK.
-/// You can customize the value with `vterm-max-scrollback`.
-///
-/// libvterm requires several callback functions that are stored
-/// in VTermScreenCallbacks.
-#[lisp_fn(name = "vterm-new")]
-pub fn vterminal_new_lisp(
-    rows: EmacsInt,
-    cols: EmacsInt,
-    process: LispObject,
-    scrollback: EmacsInt,
-) -> LispVterminalRef {
-    unsafe {
-        let mut term = allocate_vterm();
-
-        (*term).vt = vterm_new(rows as i32, cols as i32);
-        vterm_set_utf8((*term).vt, 1);
-        (*term).vts = vterm_obtain_screen((*term).vt);
-
-        let state: *mut VTermState = vterm_obtain_state((*term).vt);
+        let state: *mut VTermState = vterm_obtain_state((*self).vt);
         vterm_state_set_unrecognised_fallbacks(
             state,
             &parser_callbacks,
-            term.as_mut() as *mut libc::c_void,
+            self.as_mut() as *mut libc::c_void,
         );
-
-        vterm_screen_reset((*term).vts, 1);
-
-        vterm_screen_set_callbacks(
-            (*term).vts,
-            &vterm_screen_callbacks,
-            term.as_mut() as *mut libc::c_void,
-        );
-
-        vterm_screen_set_damage_merge((*term).vts, VTermDamageSize::VTERM_DAMAGE_SCROLL);
-
-        vterm_screen_enable_altscreen((*term).vts, 1);
-
-        (*term).sb_size = scrollback as usize;
-        (*term).sb_current = 0;
-        (*term).sb_pending = 0;
-
-        let s = mem::size_of::<VtermScrollbackLine>() * scrollback as usize;
-        (*term).sb_buffer = libc::malloc(s as libc::size_t) as *mut *mut VtermScrollbackLine;
-
-        (*term).invalid_start = 0;
-        (*term).invalid_end = rows as i32;
-
-        (*term).width = cols as i32;
-        (*term).height = rows as i32;
-
-        (*term).buffer = LispObject::from(ThreadState::current_buffer_unchecked());
-        (*term).process = process;
-
-        (*term).directory = std::mem::zeroed();
-        (*term).directory_changed = false;
-
-        term
     }
-}
 
-unsafe fn compare_cells(a: *mut VTermScreenCell, b: *mut VTermScreenCell) -> bool {
-    let a_attr = (*a).attrs;
-    let b_attr = (*b).attrs;
-
-    vterm_color_is_equal(&mut (*a).fg, &mut (*b).fg) > 0
-        && vterm_color_is_equal(&mut (*a).bg, &mut (*b).bg) > 0
-        && (a_attr.bold() == b_attr.bold())
-        && (a_attr.underline() == b_attr.underline())
-        && (a_attr.italic() == b_attr.italic())
-        && (a_attr.reverse() == b_attr.reverse())
-        && (a_attr.strike() == b_attr.strike())
-}
-
-/// Return process of terminal VTERM
-#[lisp_fn(name = "vterm-process")]
-pub fn vterminal_process(vterm: LispVterminalRef) -> LispObject {
-    (*vterm).process
-}
-
-impl LispVterminalRef {
     pub fn set_size(self, rows: i32, cols: i32) {
         unsafe {
             vterm_set_size((*self).vt, rows, cols);
         }
+    }
+
+    pub unsafe fn get_cursorpos(mut self) -> VTermPos {
+        let state: *mut VTermState = vterm_obtain_state((*self).vt);
+        let mut pos: VTermPos = std::mem::zeroed();
+        vterm_state_get_cursorpos(state, &mut pos);
+        pos
     }
 
     pub unsafe fn fetch_cell(mut self, row: i32, col: i32) -> VTermScreenCell {
@@ -259,6 +182,88 @@ impl LispVterminalRef {
     }
 }
 
+macro_rules! allocate_zeroed_pseudovector {
+    ($ty: ty, $field: ident, $vectype: expr) => {
+        unsafe {
+            crate::remacs_sys::allocate_pseudovector(
+                vecsize!($ty) as ::libc::c_int,
+                pseudovecsize!($ty, $field) as ::libc::c_int,
+                vecsize!($ty) as ::libc::c_int,
+                $vectype,
+            ) as *mut $ty
+        }
+    };
+}
+
+fn allocate_vterm() -> LispVterminalRef {
+    let v: *mut vterminal = allocate_zeroed_pseudovector!(vterminal, vt, pvec_type::PVEC_VTERMINAL);
+    LispVterminalRef::from_ptr(v as *mut c_void).unwrap()
+}
+
+/// Start a libvterm terminal-emulator in a new buffer.
+/// The maximum scrollback is set by the argument SCROLLBACK.
+/// You can customize the value with `vterm-max-scrollback`.
+///
+/// libvterm requires several callback functions that are stored
+/// in VTermScreenCallbacks.
+#[lisp_fn(name = "vterm-new")]
+pub fn vterminal_new_lisp(
+    rows: EmacsInt,
+    cols: EmacsInt,
+    process: LispObject,
+    scrollback: EmacsInt,
+) -> LispVterminalRef {
+    unsafe {
+        let mut term = allocate_vterm();
+
+        (*term).vt = vterm_new(rows as i32, cols as i32);
+        vterm_set_utf8((*term).vt, 1);
+        (*term).vts = vterm_obtain_screen((*term).vt);
+
+        term.set_callbacks();
+        vterm_screen_reset((*term).vts, 1);
+        vterm_screen_set_damage_merge((*term).vts, VTermDamageSize::VTERM_DAMAGE_SCROLL);
+
+        vterm_screen_enable_altscreen((*term).vts, 1);
+
+        (*term).sb_size = scrollback as usize;
+        let s = mem::size_of::<VtermScrollbackLine>() * scrollback as usize;
+        (*term).sb_buffer = libc::malloc(s as libc::size_t) as *mut *mut VtermScrollbackLine;
+
+        (*term).sb_current = 0;
+        (*term).sb_pending = 0;
+        (*term).invalid_start = 0;
+        (*term).invalid_end = rows as i32;
+        (*term).width = cols as i32;
+        (*term).height = rows as i32;
+        (*term).buffer = LispObject::from(ThreadState::current_buffer_unchecked());
+        (*term).process = process;
+        (*term).directory = std::mem::zeroed();
+        (*term).directory_changed = false;
+
+        term
+    }
+}
+
+unsafe fn compare_cells(a: *mut VTermScreenCell, b: *mut VTermScreenCell) -> bool {
+    let a_attr = (*a).attrs;
+    let b_attr = (*b).attrs;
+
+    vterm_color_is_equal(&mut (*a).fg, &mut (*b).fg) > 0
+        && vterm_color_is_equal(&mut (*a).bg, &mut (*b).bg) > 0
+        && (a_attr.bold() == b_attr.bold())
+        && (a_attr.underline() == b_attr.underline())
+        && (a_attr.italic() == b_attr.italic())
+        && (a_attr.reverse() == b_attr.reverse())
+        && (a_attr.strike() == b_attr.strike())
+}
+
+/// Return process of terminal VTERM
+#[lisp_fn(name = "vterm-process")]
+pub fn vterminal_process(vterm: LispVterminalRef) -> LispObject {
+    (*vterm).process
+}
+
 /// Refresh the screen (visible part of the buffer when the terminal is focused)
 /// of a invalidated terminal
 unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
@@ -276,12 +281,6 @@ unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
             LispObject::from(line_count as EmacsInt),
         );
 
-        // refresh_lines(
-        //     term,
-        //     (*term).invalid_start,
-        //     (*term).invalid_end,
-        //     (*term).width,
-        // );
         term.refresh_lines((*term).invalid_start, (*term).invalid_end, (*term).width);
     }
     (*term).invalid_start = std::i32::MAX;
@@ -310,9 +309,7 @@ unsafe fn get_col_offset(mut vterm: LispVterminalRef, row: i32, end_col: i32) ->
 unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef, added: i32) {
     let buffer_lnum = vterminal_count_lines();
 
-    let state: *mut VTermState = vterm_obtain_state((*term).vt);
-    let mut pos: VTermPos = std::mem::zeroed();
-    vterm_state_get_cursorpos(state, &mut pos);
+    let mut pos = term.get_cursorpos();
 
     let cursor_lnum = row_to_linenr(term.as_mut() as *mut vterminal, pos.row);
 
@@ -362,7 +359,6 @@ unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
         let buf_index = buffer_lnum as i32 - (*term).height + 1;
         vterminal_goto_line(buf_index as EmacsInt);
 
-        // refresh_lines(term, -(*term).sb_pending, 0, (*term).width);
         term.refresh_lines(-(*term).sb_pending, 0, (*term).width);
         (*term).sb_pending = 0;
     }
