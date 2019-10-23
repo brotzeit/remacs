@@ -157,21 +157,6 @@ pub fn vterminal_new_lisp(
     }
 }
 
-impl VTermScreenCellRef {
-    pub unsafe fn compare(mut self, mut other:  VTermScreenCellRef) -> bool {
-        let self_attr = (*self).attrs;
-        let other_attr = (*other).attrs;
-
-        vterm_color_is_equal(&mut (*self).fg, &mut (*other).fg) > 0
-            && vterm_color_is_equal(&mut (*self).bg, &mut (*other).bg) > 0
-            && (self_attr.bold() == other_attr.bold())
-            && (self_attr.underline() == other_attr.underline())
-            && (self_attr.italic() == other_attr.italic())
-            && (self_attr.reverse() == other_attr.reverse())
-            && (self_attr.strike() == other_attr.strike())
-    }
-}
-
 unsafe fn compare_cells(a: *mut VTermScreenCell, b: *mut VTermScreenCell) -> bool {
     let a_attr = (*a).attrs;
     let b_attr = (*b).attrs;
@@ -199,86 +184,79 @@ impl LispVterminalRef {
     }
 
     pub unsafe fn fetch_cell(mut self, row: i32, col: i32) -> VTermScreenCell {
-
-            let mut cell: VTermScreenCell = std::mem::zeroed();
-            fetch_cell(self.as_mut (), row, col, &mut cell);
-            cell
-
+        let mut cell: VTermScreenCell = std::mem::zeroed();
+        fetch_cell(self.as_mut(), row, col, &mut cell);
+        cell
     }
-}
 
-unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i32, end_col: i32) {
-    let mut size = ((end_row - start_row + 1) * end_col) * 4;
-    let mut v: Vec<c_char> = Vec::with_capacity(size as usize);
+    pub unsafe fn is_eol(mut self, end_col: i32, row: i32, col: i32) -> bool {
+        is_eol(self.as_mut(), end_col, row, col)
+    }
 
-    let mut cell: VTermScreenCell = std::mem::zeroed();
-    let mut lastcell: VTermScreenCell = vterm.fetch_cell(start_row, 0);
+    pub unsafe fn refresh_lines(mut self, start_row: i32, end_row: i32, end_col: i32) {
+        let mut size = ((end_row - start_row + 1) * end_col) * 4;
+        let mut v: Vec<c_char> = Vec::with_capacity(size as usize);
 
-    let mut length = 0;
-    let mut offset = 0;
+        let mut cell: VTermScreenCell = std::mem::zeroed();
+        let mut lastcell: VTermScreenCell = self.fetch_cell(start_row, 0);
 
-    let mut i = start_row;
-    while i < end_row {
-        let mut j = 0;
-        while j < end_col {
-            cell = vterm.fetch_cell(i, j);
+        let mut length = 0;
+        let mut offset = 0;
 
-            if !compare_cells(&mut cell, &mut lastcell) {
-            // if !cell.compare(lastcell) {
-                let mut text = vterminal_render_text(
-                    vterm,
-                    v.as_mut_ptr(),
-                    length,
-                    &mut lastcell, 
-                );
-                Finsert(1, &mut text);
+        let mut i = start_row;
+        while i < end_row {
+            let mut j = 0;
+            while j < end_col {
+                cell = self.fetch_cell(i, j);
 
-                size -= length;
-                v = Vec::with_capacity(size as usize);
-                length = 0;
-            }
+                if !compare_cells(&mut cell, &mut lastcell) {
+                    // if !cell.compare(lastcell) {
+                    let mut text =
+                        vterminal_render_text(self, v.as_mut_ptr(), length, &mut lastcell);
+                    Finsert(1, &mut text);
 
-            lastcell = cell;
-            if cell.chars[0] == 0 {
-                if is_eol(vterm.as_mut(), end_col, i, j) {
-                    /* This cell is EOL if this and every cell to the right is black */
-                    break;
+                    size -= length;
+                    v = Vec::with_capacity(size as usize);
+                    length = 0;
                 }
 
-                v.push(' ' as c_char);
-                length += 1;
-            } else {
-                let mut bytes: [c_uchar; 4] = std::mem::zeroed();
-                let count = codepoint_to_utf8(cell.chars[0], bytes.as_mut_ptr());
+                lastcell = cell;
+                if cell.chars[0] == 0 {
+                    if self.is_eol(end_col, i, j) {
+                        /* This cell is EOL if this and every cell to the right is black */
+                        break;
+                    }
 
-                let mut k = 0;
-                while k < count {
-                    v.push(bytes[k] as c_char);
+                    v.push(' ' as c_char);
                     length += 1;
-                    k += 1;
+                } else {
+                    let mut bytes: [c_uchar; 4] = std::mem::zeroed();
+                    let count = codepoint_to_utf8(cell.chars[0], bytes.as_mut_ptr());
+
+                    let mut k = 0;
+                    while k < count {
+                        v.push(bytes[k] as c_char);
+                        length += 1;
+                        k += 1;
+                    }
                 }
+
+                if cell.width > 1 {
+                    let w = cell.width - 1;
+                    offset += w;
+                    j = j + w as i32;
+                }
+                j += 1;
             }
 
-            if cell.width > 1 {
-                let w = cell.width - 1;
-                offset += w;
-                j = j + w as i32;
-            }
-            j += 1;
+            v.push('\n' as c_char);
+            length += 1;
+            i += 1;
         }
 
-        v.push('\n' as c_char);
-        length += 1;
-        i += 1;
+        let mut text = vterminal_render_text(self, v.as_mut_ptr(), length, &mut lastcell);
+        Finsert(1, &mut text);
     }
-
-    let mut text = vterminal_render_text(
-        vterm,
-        v.as_mut_ptr(),
-        length,
-        &mut lastcell, 
-    );
-    Finsert(1, &mut text);
 }
 
 /// Refresh the screen (visible part of the buffer when the terminal is focused)
@@ -298,12 +276,13 @@ unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
             LispObject::from(line_count as EmacsInt),
         );
 
-        refresh_lines(
-            term,
-            (*term).invalid_start,
-            (*term).invalid_end,
-            (*term).width,
-        );
+        // refresh_lines(
+        //     term,
+        //     (*term).invalid_start,
+        //     (*term).invalid_end,
+        //     (*term).width,
+        // );
+        term.refresh_lines((*term).invalid_start, (*term).invalid_end, (*term).width);
     }
     (*term).invalid_start = std::i32::MAX;
     (*term).invalid_end = -1;
@@ -314,15 +293,13 @@ unsafe fn get_col_offset(mut vterm: LispVterminalRef, row: i32, end_col: i32) ->
 
     let mut col: i32 = 0;
     while col < end_col {
-        // let mut cell: VTermScreenCell = std::mem::zeroed();
-        // fetch_cell(vterm.as_mut(), row, col, &mut cell);
         let mut cell = vterm.fetch_cell(row, col);
 
         if cell.chars[0] > 0 {
             if cell.width > 0 {
                 offset += cell.width as size_t - 1;
             }
-        } else if is_eol(vterm.as_mut(), (*vterm).width, row, col) {
+        } else if vterm.is_eol((*vterm).width, row, col) {
             offset += cell.width as size_t;
         }
         col += cell.width as i32;
@@ -385,7 +362,8 @@ unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
         let buf_index = buffer_lnum as i32 - (*term).height + 1;
         vterminal_goto_line(buf_index as EmacsInt);
 
-        refresh_lines(term, -(*term).sb_pending, 0, (*term).width);
+        // refresh_lines(term, -(*term).sb_pending, 0, (*term).width);
+        term.refresh_lines(-(*term).sb_pending, 0, (*term).width);
         (*term).sb_pending = 0;
     }
 
