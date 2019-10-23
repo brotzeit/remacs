@@ -239,6 +239,8 @@ pub fn vterminal_new_lisp(
         (*term).process = process;
         (*term).directory = std::mem::zeroed();
         (*term).directory_changed = false;
+        (*term).linenum = 0;
+        
 
         term
     }
@@ -305,7 +307,7 @@ unsafe fn get_col_offset(mut vterm: LispVterminalRef, row: i32, end_col: i32) ->
     offset as i32
 }
 
-unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef, added: i32) {
+unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef) {
     let buffer_lnum = vterminal_count_lines();
 
     let mut pos = term.get_cursorpos();
@@ -579,12 +581,9 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
 
     if vterm.is_invalidated {
         let bufline_before = vterminal_count_lines();
-
         vterminal_refresh_scrollback(vterm);
         vterminal_refresh_screen(vterm);
-
         let line_added = vterminal_count_lines() - bufline_before;
-
         vterminal_adjust_topline(vterm, line_added);
     }
 
@@ -602,21 +601,14 @@ pub fn vterminal_delete_lines(linenum: EmacsInt, count: LispObject) {
     unsafe {
         let mut cur_buf = ThreadState::current_buffer_unchecked();
         let orig_pt = cur_buf.pt;
-
         vterminal_goto_line(linenum);
-
         let start = cur_buf.pt;
-
         let end = EmacsInt::from(Fline_end_position(count)) as isize;
-
         del_range(start, end);
-
         let pos = cur_buf.pt;
-
         if !looking_at_1(make_string("\n".as_ptr() as *mut c_char, 1), false).is_nil() {
             del_range(pos, pos + 1);
         }
-
         set_point(cmp::min(orig_pt, cur_buf.zv))
     };
 }
@@ -627,21 +619,16 @@ pub fn vterminal_count_lines() -> i32 {
     unsafe {
         let cur_buf = ThreadState::current_buffer_unchecked();
         let orig_pt = cur_buf.pt;
-
         set_point(cur_buf.beg());
-
         let mut count: i32 = 0;
         let regexp = make_string("\n".as_ptr() as *mut c_char, 1);
         while !search_command(regexp, Qnil, Qt, LispObject::from(1), 1, 0, false).is_nil() {
             count += 1;
         }
-
         if !(cur_buf.pt == cur_buf.begv || cur_buf.fetch_byte(cur_buf.pt_byte - 1) == b'\n') {
             count += 1;
         }
-
         set_point(orig_pt);
-
         count
     }
 }
@@ -650,9 +637,7 @@ pub fn vterminal_count_lines() -> i32 {
 pub fn vterminal_goto_line(line: EmacsInt) {
     unsafe {
         set_point(1);
-
         let regexp = make_string("\n".as_ptr() as *mut c_char, 1);
-
         search_command(regexp, Qnil, Qt, LispObject::from(line - 1), 1, 0, false)
     };
 }
@@ -729,5 +714,6 @@ pub unsafe extern "C" fn vterminal_resize(
 // pub extern "C" fn rust_syms_of_vterm() {
 //     def_lisp_sym!(Qvtermp, "vtermp");
 // }
+
 
 include!(concat!(env!("OUT_DIR"), "/vterm_exports.rs"));
