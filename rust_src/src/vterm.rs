@@ -197,8 +197,6 @@ unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i3
     let mut v: Vec<c_char> = Vec::with_capacity(size as usize);
 
     let mut cell: VTermScreenCell = std::mem::zeroed();
-    // let mut lastcell: VTermScreenCell = std::mem::zeroed();
-    // fetch_cell(vterm.as_mut(), start_row, 0, &mut lastcell);
     let mut lastcell = vterm.fetch_cell(start_row, 0);
 
     let mut length = 0;
@@ -208,7 +206,7 @@ unsafe fn refresh_lines(mut vterm: LispVterminalRef, start_row: i32, end_row: i3
     while i < end_row {
         let mut j = 0;
         while j < end_col {
-            fetch_cell(vterm.as_mut(), i, j, &mut cell);
+            cell = vterm.fetch_cell(i, j);
 
             if !compare_cells(&mut cell, &mut lastcell) {
                 let mut text = vterminal_render_text(vterm, v.as_mut_ptr(), length, &mut lastcell);
@@ -290,8 +288,9 @@ unsafe fn get_col_offset(mut vterm: LispVterminalRef, row: i32, end_col: i32) ->
 
     let mut col: i32 = 0;
     while col < end_col {
-        let mut cell: VTermScreenCell = std::mem::zeroed();
-        fetch_cell(vterm.as_mut(), row, col, &mut cell);
+        // let mut cell: VTermScreenCell = std::mem::zeroed();
+        // fetch_cell(vterm.as_mut(), row, col, &mut cell);
+        let mut cell = vterm.fetch_cell(row, col);
 
         if cell.chars[0] > 0 {
             if cell.width > 0 {
