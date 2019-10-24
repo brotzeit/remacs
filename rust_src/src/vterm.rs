@@ -151,7 +151,8 @@ impl LispVterminalRef {
                     length += 1;
                 } else {
                     let mut bytes: [c_uchar; 4] = std::mem::zeroed();
-                    let count = codepoint_to_utf8(cell.chars[0], bytes.as_mut_ptr());
+                    // let count = codepoint_to_utf8(cell.chars[0], bytes.as_mut_ptr());
+                    let count = cell.to_utf8( &mut bytes);
 
                     let mut k = 0;
                     while k < count {
@@ -178,23 +179,50 @@ impl LispVterminalRef {
     }
 }
 
+
 impl VTermScreenCell {
-    pub unsafe fn test(self) -> LispObject {
-        let mut bytes: [c_uchar; 4] = std::mem::zeroed();
-        let count = codepoint_to_utf8(self.chars[0], bytes.as_mut_ptr());
+    pub unsafe fn to_utf8(self, to: &mut [u8]) -> usize {
+        // let mut to: [c_uchar; 4] = std::mem::zeroed();
+        let cp = self.chars[0];
 
-        make_string(bytes.as_ptr() as *mut c_char, count as isize)
+        if cp <= 0x7F {
+            to[0] = cp as u8;
+            1
+        } else if cp >= 0x80 && cp <= 0x07FF {
+            // note: setting later bytes first to avoid multiple bound checks
+            to[1] = 0x80 | (cp & 0x3F) as u8;
+            to[0] = 0xC0 | (cp >> 6) as u8;
+            2
+        } else if cp >= 0x0800 && cp <= 0xFFFF {
+            to[2] = 0x80 | (cp & 0x3F) as u8;
+            to[1] = 0x80 | ((cp >> 6) & 0x3F) as u8;
+            to[0] = 0xE0 | (cp >> 12) as u8;
+            3
+        } else if cp >= 0x10000 && cp <= 0x10FFFF {
+            to[3] = 0x80 | (cp & 0x3F) as u8;
+            to[2] = 0x80 | ((cp >> 6) & 0x3F) as u8;
+            to[1] = 0x80 | ((cp >> 12) & 0x3F) as u8;
+            to[0] = 0xF0 | (cp >> 18) as u8;
+            4
+        } else {
+            0
+        }
+        
+
     }
 }
 
-#[lisp_fn(name = "vterm-foo")]
-pub fn vterminal_foo(vterm: LispVterminalRef) -> LispObject {
-    unsafe {
-        // let mut cell: VTermScreenCell = std::mem::zeroed();
-        let cell: VTermScreenCell = vterm.fetch_cell(0, 2);
-        cell.test()
-    }
-}
+
+
+
+// #[lisp_fn(name = "vterm-foo")]
+// pub fn vterminal_foo(vterm: LispVterminalRef) -> LispObject {
+//     unsafe {
+//         // let mut cell: VTermScreenCell = std::mem::zeroed();
+//         let cell: VTermScreenCell = vterm.fetch_cell(0, 2);
+//         cell.test()
+//     }
+// }
 
 macro_rules! allocate_zeroed_pseudovector {
     ($ty: ty, $field: ident, $vectype: expr) => {
