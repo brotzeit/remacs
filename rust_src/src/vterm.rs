@@ -151,15 +151,11 @@ impl LispVterminalRef {
                     length += 1;
                 } else {
                     let mut bytes: [c_uchar; 4] = std::mem::zeroed();
-                    // let count = codepoint_to_utf8(cell.chars[0], bytes.as_mut_ptr());
-                    let count = cell.to_utf8( &mut bytes);
-
-                    let mut k = 0;
-                    while k < count {
-                        v.push(bytes[k] as c_char);
-                        length += 1;
-                        k += 1;
+                    let size = cell.to_utf8( &mut bytes);
+                    for n in  0..size {
+                        v.push(bytes[n] as c_char);
                     }
+                    length += size as i32;
                 }
 
                 if cell.width > 1 {
@@ -182,7 +178,6 @@ impl LispVterminalRef {
 
 impl VTermScreenCell {
     pub unsafe fn to_utf8(self, to: &mut [u8]) -> usize {
-        // let mut to: [c_uchar; 4] = std::mem::zeroed();
         let cp = self.chars[0];
 
         if cp <= 0x7F {
