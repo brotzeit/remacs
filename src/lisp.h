@@ -4871,7 +4871,7 @@ extern int vterminal_damage(VTermRect rect, void *data);
 extern int vterminal_moverect(VTermRect dest, VTermRect src, void *data);
 extern Lisp_Object color_to_rgb_string(vterminal *term, VTermColor *color);
 extern int vterminal_settermprop(VTermProp prop, VTermValue *val, void *user_data);
-extern size_t codepoint_to_utf8(const uint32_t codepoint, unsigned char buffer[4]);
+
 extern bool utf8_to_codepoint(const unsigned char buffer[4], const size_t len,
                               uint32_t *codepoint);
 extern int vterminal_resize (int rows, int cols, void *user_data);

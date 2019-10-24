@@ -107,33 +107,6 @@ static int vterminal_sb_pop(int cols, VTermScreenCell *cells, void *data) {
   return 1;
 }
 
-size_t
-codepoint_to_utf8(const uint32_t codepoint, unsigned char buffer[4]) {
-  if (codepoint <= 0x7F) {
-    buffer[0] = codepoint;
-    return 1;
-  }
-  if (codepoint >= 0x80 && codepoint <= 0x07FF) {
-    buffer[0] = 0xC0 | (codepoint >> 6);
-    buffer[1] = 0x80 | (codepoint & 0x3F);
-    return 2;
-  }
-  if (codepoint >= 0x0800 && codepoint <= 0xFFFF) {
-    buffer[0] = 0xE0 | (codepoint >> 12);
-    buffer[1] = 0x80 | ((codepoint >> 6) & 0x3F);
-    buffer[2] = 0x80 | (codepoint & 0x3F);
-    return 3;
-  }
-
-  if (codepoint >= 0x10000 && codepoint <= 0x10FFFF) {
-    buffer[0] = 0xF0 | (codepoint >> 18);
-    buffer[1] = 0x80 | ((codepoint >> 12) & 0x3F);
-    buffer[2] = 0x80 | ((codepoint >> 6) & 0x3F);
-    buffer[3] = 0x80 | (codepoint & 0x3F);
-    return 4;
-  }
-  return 0;
-}
 
 bool
 utf8_to_codepoint(const unsigned char buffer[4], const size_t len,

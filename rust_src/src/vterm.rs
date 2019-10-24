@@ -21,7 +21,7 @@ use crate::{
     },
 
     remacs_sys::{
-        codepoint_to_utf8, fetch_cell, is_eol, parser_callbacks, row_to_linenr, search_command,
+         fetch_cell, is_eol, parser_callbacks, row_to_linenr, search_command,
         set_point, term_redraw_cursor, utf8_to_codepoint, vterm_output_read,
         vterm_screen_callbacks, vterm_screen_set_callbacks, VtermScrollbackLine,
     },
