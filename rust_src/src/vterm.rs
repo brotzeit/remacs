@@ -240,7 +240,6 @@ pub fn vterminal_new_lisp(
         (*term).directory = std::mem::zeroed();
         (*term).directory_changed = false;
         (*term).linenum = 0;
-        
 
         term
     }
@@ -320,7 +319,7 @@ unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef) {
 
     Fforward_char(LispObject::from((pos.col - offset as i32) as EmacsInt));
 
-    let following = buffer_lnum == cursor_lnum + added; // cursor at end?
+    let following = buffer_lnum == cursor_lnum; // cursor at end?
 
     let window = Fget_buffer_window(term.buffer, Qt);
     let swindow = Fselected_window();
@@ -584,7 +583,7 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
         vterminal_refresh_scrollback(vterm);
         vterminal_refresh_screen(vterm);
         let line_added = vterminal_count_lines() - bufline_before;
-        vterminal_adjust_topline(vterm, line_added);
+        vterminal_adjust_topline(vterm);
     }
 
     if (*vterm).directory_changed {
@@ -714,6 +713,5 @@ pub unsafe extern "C" fn vterminal_resize(
 // pub extern "C" fn rust_syms_of_vterm() {
 //     def_lisp_sym!(Qvtermp, "vtermp");
 // }
-
 
 include!(concat!(env!("OUT_DIR"), "/vterm_exports.rs"));
