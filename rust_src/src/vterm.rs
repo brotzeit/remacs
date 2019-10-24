@@ -133,9 +133,7 @@ impl LispVterminalRef {
                 cell = self.fetch_cell(i, j);
 
                 if !compare_cells(&mut cell, &mut lastcell) {
-                    let mut text =
-                        vterminal_render_text(self, v.as_mut_ptr(), length, &mut lastcell);
-                    Finsert(1, &mut text);
+                    vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
 
                     size -= length;
                     v = Vec::with_capacity(size as usize);
@@ -176,8 +174,25 @@ impl LispVterminalRef {
             i += 1;
         }
 
-        let mut text = vterminal_render_text(self, v.as_mut_ptr(), length, &mut lastcell);
-        Finsert(1, &mut text);
+        let mut text = vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
+    }
+}
+
+impl VTermScreenCell {
+    pub unsafe fn test(self) -> LispObject {
+        let mut bytes: [c_uchar; 4] = std::mem::zeroed();
+        let count = codepoint_to_utf8(self.chars[0], bytes.as_mut_ptr());
+
+        make_string(bytes.as_ptr() as *mut c_char, count as isize)
+    }
+}
+
+#[lisp_fn(name = "vterm-foo")]
+pub fn vterminal_foo(vterm: LispVterminalRef) -> LispObject {
+    unsafe {
+        // let mut cell: VTermScreenCell = std::mem::zeroed();
+        let cell: VTermScreenCell = vterm.fetch_cell(0, 2);
+        cell.test()
     }
 }
 
@@ -477,16 +492,14 @@ pub fn vterminal_update(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn vterminal_render_text(
+pub unsafe extern "C" fn vterminal_insert(
     mut vterm: LispVterminalRef,
     buffer: *mut c_char,
     len: i32,
     cell: *mut VTermScreenCell,
-) -> LispObject {
-    if len == 0 {
-        make_string("".as_ptr() as *mut c_char, 0)
-    } else {
-        let text = make_string(buffer, len as isize);
+) {
+    if len > 0 {
+        let mut text = make_string(buffer, len as isize);
 
         let start = LispObject::from(0);
         let end = LispObject::from(EmacsInt::from(Flength(text)));
@@ -524,7 +537,7 @@ pub unsafe extern "C" fn vterminal_render_text(
         );
 
         Fput_text_property(start, end, Qface, properties, text);
-        text
+        Finsert(1, &mut text);
     }
 }
 
