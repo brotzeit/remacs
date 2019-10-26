@@ -21,9 +21,9 @@ use crate::{
     },
 
     remacs_sys::{
-         fetch_cell, is_eol, parser_callbacks, row_to_linenr, search_command,
-        set_point, term_redraw_cursor, utf8_to_codepoint, vterm_output_read,
-        vterm_screen_callbacks, vterm_screen_set_callbacks, VtermScrollbackLine,
+        fetch_cell, is_eol, parser_callbacks, row_to_linenr, search_command, set_point,
+        term_redraw_cursor, utf8_to_codepoint, vterm_output_read, vterm_screen_callbacks,
+        vterm_screen_set_callbacks, VtermScrollbackLine,
     },
 
     // libvterm
@@ -132,7 +132,8 @@ impl LispVterminalRef {
             while j < end_col {
                 cell = self.fetch_cell(i, j);
 
-                if !compare_cells(&mut cell, &mut lastcell) {
+                // if !compare_cells(&mut cell, &mut lastcell) {
+                if cell.compare (lastcell) {
                     vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
 
                     size -= length;
@@ -151,8 +152,8 @@ impl LispVterminalRef {
                     length += 1;
                 } else {
                     let mut bytes: [c_uchar; 4] = std::mem::zeroed();
-                    let size = cell.to_utf8( &mut bytes);
-                    for n in  0..size {
+                    let size = cell.to_utf8(&mut bytes);
+                    for n in 0..size {
                         v.push(bytes[n] as c_char);
                     }
                     length += size as i32;
@@ -174,7 +175,6 @@ impl LispVterminalRef {
         let mut text = vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
     }
 }
-
 
 impl VTermScreenCell {
     pub unsafe fn to_utf8(self, to: &mut [u8]) -> usize {
@@ -202,13 +202,21 @@ impl VTermScreenCell {
         } else {
             0
         }
-        
+    }
 
+    pub unsafe fn compare(self, other: VTermScreenCell) -> bool {
+        let self_attr = self.attrs;
+        let other_attr = other.attrs;
+
+        vterm_color_is_equal(&self.fg, &other.fg) > 0
+            && vterm_color_is_equal(&self.bg, &other.bg) > 0
+            && (self_attr.bold() == other_attr.bold())
+            && (self_attr.underline() == other_attr.underline())
+            && (self_attr.italic() == other_attr.italic())
+            && (self_attr.reverse() == other_attr.reverse())
+            && (self_attr.strike() == other_attr.strike())
     }
 }
-
-
-
 
 // #[lisp_fn(name = "vterm-foo")]
 // pub fn vterminal_foo(vterm: LispVterminalRef) -> LispObject {
@@ -281,19 +289,6 @@ pub fn vterminal_new_lisp(
 
         term
     }
-}
-
-unsafe fn compare_cells(a: *mut VTermScreenCell, b: *mut VTermScreenCell) -> bool {
-    let a_attr = (*a).attrs;
-    let b_attr = (*b).attrs;
-
-    vterm_color_is_equal(&mut (*a).fg, &mut (*b).fg) > 0
-        && vterm_color_is_equal(&mut (*a).bg, &mut (*b).bg) > 0
-        && (a_attr.bold() == b_attr.bold())
-        && (a_attr.underline() == b_attr.underline())
-        && (a_attr.italic() == b_attr.italic())
-        && (a_attr.reverse() == b_attr.reverse())
-        && (a_attr.strike() == b_attr.strike())
 }
 
 /// Return process of terminal VTERM
@@ -634,7 +629,7 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
 #[lisp_fn]
 pub fn vterminal_delete_lines(linenum: EmacsInt, count: LispObject) {
     unsafe {
-        let mut cur_buf = ThreadState::current_buffer_unchecked();
+        let cur_buf = ThreadState::current_buffer_unchecked();
         let orig_pt = cur_buf.pt;
         vterminal_goto_line(linenum);
         let start = cur_buf.pt;
