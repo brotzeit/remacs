@@ -21,9 +21,9 @@ use crate::{
     },
 
     remacs_sys::{
-        fetch_cell, is_eol, parser_callbacks, row_to_linenr, search_command, set_point,
-        term_redraw_cursor, utf8_to_codepoint, vterm_output_read, vterm_screen_callbacks,
-        vterm_screen_set_callbacks, VtermScrollbackLine,
+        fetch_cell, parser_callbacks, row_to_linenr, search_command, set_point, term_redraw_cursor,
+        utf8_to_codepoint, vterm_output_read, vterm_screen_callbacks, vterm_screen_set_callbacks,
+        VtermScrollbackLine,is_eol
     },
 
     // libvterm
@@ -31,8 +31,8 @@ use crate::{
         vterm_color_is_equal, vterm_input_write, vterm_keyboard_end_paste, vterm_keyboard_key,
         vterm_keyboard_start_paste, vterm_keyboard_unichar, vterm_new, vterm_obtain_screen,
         vterm_obtain_state, vterm_output_get_buffer_current, vterm_screen_enable_altscreen,
-        vterm_screen_flush_damage, vterm_screen_reset, vterm_screen_set_damage_merge,
-        vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos,
+        vterm_screen_flush_damage, vterm_screen_is_eol, vterm_screen_reset,
+        vterm_screen_set_damage_merge, vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos,
         vterm_state_set_unrecognised_fallbacks, VTermDamageSize, VTermKey, VTermModifier, VTermPos,
         VTermProp, VTermRect, VTermScreenCell, VTermState, VTermValue,
     },
@@ -99,7 +99,7 @@ impl LispVterminalRef {
         }
     }
 
-    pub unsafe fn get_cursorpos(mut self) -> VTermPos {
+    pub unsafe fn get_cursorpos(self) -> VTermPos {
         let state: *mut VTermState = vterm_obtain_state((*self).vt);
         let mut pos: VTermPos = std::mem::zeroed();
         vterm_state_get_cursorpos(state, &mut pos);
@@ -124,7 +124,6 @@ impl LispVterminalRef {
         let mut lastcell: VTermScreenCell = self.fetch_cell(start_row, 0);
 
         let mut length = 0;
-        let mut offset = 0;
 
         let mut i = start_row;
         while i < end_row {
@@ -132,8 +131,7 @@ impl LispVterminalRef {
             while j < end_col {
                 cell = self.fetch_cell(i, j);
 
-                // if !compare_cells(&mut cell, &mut lastcell) {
-                if cell.compare (lastcell) {
+                if !cell.compare(lastcell) {
                     vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
 
                     size -= length;
@@ -161,7 +159,6 @@ impl LispVterminalRef {
 
                 if cell.width > 1 {
                     let w = cell.width - 1;
-                    offset += w;
                     j = j + w as i32;
                 }
                 j += 1;
@@ -172,7 +169,7 @@ impl LispVterminalRef {
             i += 1;
         }
 
-        let mut text = vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
+        vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
     }
 }
 
@@ -204,6 +201,7 @@ impl VTermScreenCell {
         }
     }
 
+    /// Compare cell attributes
     pub unsafe fn compare(self, other: VTermScreenCell) -> bool {
         let self_attr = self.attrs;
         let other_attr = other.attrs;
@@ -218,14 +216,31 @@ impl VTermScreenCell {
     }
 }
 
-// #[lisp_fn(name = "vterm-foo")]
-// pub fn vterminal_foo(vterm: LispVterminalRef) -> LispObject {
-//     unsafe {
-//         // let mut cell: VTermScreenCell = std::mem::zeroed();
-//         let cell: VTermScreenCell = vterm.fetch_cell(0, 2);
-//         cell.test()
-//     }
-// }
+impl VTermPos {
+    pub unsafe fn is_eol(self, vterm: LispVterminalRef) -> bool {
+        vterm_screen_is_eol((*vterm).vts, self) > 0
+    }
+
+    pub unsafe fn col_offset(self, vterm: LispVterminalRef) -> i32 {
+        let mut offset: size_t = 0;
+        let pos_col = self.col;
+
+        let mut col: i32 = 0;
+        while col < pos_col {
+            let cell = vterm.fetch_cell(self.row, col);
+
+            if cell.chars[0] > 0 {
+                if cell.width > 0 {
+                    offset += cell.width as size_t - 1;
+                }
+            } else if vterm.is_eol((*vterm).width, self.row, col) {
+                offset += cell.width as size_t;
+            }
+            col += cell.width as i32;
+        }
+        offset as i32
+    }
+}
 
 macro_rules! allocate_zeroed_pseudovector {
     ($ty: ty, $field: ident, $vectype: expr) => {
@@ -320,35 +335,17 @@ unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
     (*term).invalid_end = -1;
 }
 
-unsafe fn get_col_offset(mut vterm: LispVterminalRef, row: i32, end_col: i32) -> i32 {
-    let mut offset: size_t = 0;
-
-    let mut col: i32 = 0;
-    while col < end_col {
-        let mut cell = vterm.fetch_cell(row, col);
-
-        if cell.chars[0] > 0 {
-            if cell.width > 0 {
-                offset += cell.width as size_t - 1;
-            }
-        } else if vterm.is_eol((*vterm).width, row, col) {
-            offset += cell.width as size_t;
-        }
-        col += cell.width as i32;
-    }
-    offset as i32
-}
-
 unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef) {
     let buffer_lnum = vterminal_count_lines();
 
-    let mut pos = term.get_cursorpos();
+    let pos: VTermPos = term.get_cursorpos();
 
     let cursor_lnum = row_to_linenr(term.as_mut() as *mut vterminal, pos.row);
 
     vterminal_goto_line(cmp::min(cursor_lnum, buffer_lnum) as EmacsInt);
 
-    let offset = get_col_offset(term, pos.row, pos.col);
+    // let offset = get_col_offset(term, pos.row, pos.col);
+    let offset = pos.col_offset(term);
 
     Fforward_char(LispObject::from((pos.col - offset as i32) as EmacsInt));
 
@@ -613,7 +610,7 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
         let bufline_before = vterminal_count_lines();
         vterminal_refresh_scrollback(vterm);
         vterminal_refresh_screen(vterm);
-        let line_added = vterminal_count_lines() - bufline_before;
+        let _line_added = vterminal_count_lines() - bufline_before;
         vterminal_adjust_topline(vterm);
     }
 
