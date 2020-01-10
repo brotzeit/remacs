@@ -131,14 +131,17 @@ impl LispVterminalRef {
             while j < end_col {
                 let cell = self.fetch_cell(i, j);
 
+                // if cell attributes are not equal to last cell, insert text
                 if !cell.compare(lastcell) {
                     vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
 
                     size -= length;
+                    // use vector with update size
                     v = Vec::with_capacity(size as usize);
                     length = 0;
                 }
 
+                 // only check once where eol is -> not needed to be called multiple times
                 lastcell = cell;
                 if cell.chars[0] == 0 {
                     if self.is_eol(end_col, i, j) {
