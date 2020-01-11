@@ -271,7 +271,6 @@ unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
     (*term).invalid_end = cmp::min((*term).invalid_end, (*term).height);
 
     if (*term).invalid_end >= (*term).invalid_start {
-        // let line_start = row_to_linenr(term.as_mut() as *mut vterminal, (*term).invalid_start);
         let startrow = (*term).height - (*term).invalid_start - (*term).linenum_added as i32;
         /* startrow is negative,so we backward  -startrow lines from end of buffer
           then delete lines there.
@@ -295,18 +294,14 @@ unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
 unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef) {
     let state: *mut VTermState = vterm_obtain_state((*term).vt);
 
-    // let buffer_lnum = vterminal_count_lines();
-
     let pos: VTermPos = term.get_cursorpos();
 
-    // let cursor_lnum = row_to_linenr(term.as_mut() as *mut vterminal, pos.row);
 
     /* pos.row-term->height is negative,so we backward term->height-pos.row
      * lines from end of buffer
      */
     vterminal_goto_line(EmacsInt::from(pos.row - (*term).height));
 
-    // let offset = get_col_offset(term, pos.row, pos.col);
     let offset = pos.col_offset(term);
 
     Fforward_char(LispObject::from(pos.col - offset as i32));
@@ -335,7 +330,6 @@ unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef) {
 
 /// Refresh the scrollback of an invalidated terminal.
 unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
-    // let mut buffer_lnum: i32;
     let max_line_count = (*term).sb_current as i32 + (*term).height;
     let mut del_cnt = 0;
 
@@ -345,48 +339,30 @@ unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
         // pending scrollback row into a string and append it just above the visible
         // section of the buffer
 
-        // buffer_lnum = vterminal_count_lines();
-        // let del_cnt = buffer_lnum as i32 - (*term).height - (*term).sb_size as i32 + (*term).sb_pending;
-
-        del_cnt = (*term).linenum - (*term).height as i64 - (*term).sb_size as i64
-            + (*term).sb_pending as i64
-            - (*term).sb_pending_by_height_decr as i64;
+        del_cnt = (*term).linenum - (*term).height - (*term).sb_size as i32
+            + (*term).sb_pending
+            - (*term).sb_pending_by_height_decr;
 
         if del_cnt > 0 {
             vterminal_delete_lines(1, LispObject::from(del_cnt as EmacsInt));
-            // buffer_lnum = vterminal_count_lines();
             (*term).linenum -= del_cnt;
         }
 
-        // (*term).linenum = -((*term).height + del_cnt);
-        // let buf_index = buffer_lnum as i32 - (*term).height + 1;
-
-        (*term).linenum = (*term).sb_pending as i64;
-        del_cnt = (*term).linenum - max_line_count as i64; /* extra lines at the bottom */
+        (*term).linenum = (*term).sb_pending;
+        del_cnt = (*term).linenum - max_line_count; /* extra lines at the bottom */
         /* buf_index is negative,so we move to end of buffer,then backward
         -buf_index lines. goto lines backward is effectively when
         vterm-max-scrollback is a large number.
          */
 
-        let buf_index = -((*term).height + del_cnt as i32);
+        let buf_index = -((*term).height + del_cnt);
         vterminal_goto_line(buf_index as EmacsInt);
 
         term.refresh_lines(-(*term).sb_pending, 0, (*term).width);
         (*term).sb_pending = 0;
     }
 
-    // let max_line_count = (*term).sb_current as i32 + (*term).height;
-    // buffer_lnum = vterminal_count_lines();
-
     // Remove extra lines at the bottom
-
-    // if buffer_lnum as i32 > max_line_count {
-    //     let line_count = buffer_lnum as i32 - max_line_count + 1;
-    //     vterminal_delete_lines(
-    //         max_line_count as EmacsInt + 1,
-    //         LispObject::from(line_count as EmacsInt),
-    //     );
-    // }
 
     del_cnt = (*term).linenum - max_line_count as i64;
     if del_cnt > 0 {
@@ -475,14 +451,12 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
     term_redraw_cursor(vterm.as_mut());
 
     if vterm.is_invalidated {
-        // let bufline_before = vterminal_count_lines();
         let oldlinenum = (*vterm).linenum;
 
         vterminal_refresh_scrollback(vterm);
         vterminal_refresh_screen(vterm);
-        // let _line_added = vterminal_count_lines() - bufline_before;
         (*vterm).linenum_added = (*vterm).linenum - oldlinenum;
-        vterminal_adjust_topline(vterm);
+        // vterminal_adjust_topline(vterm);
         (*vterm).linenum_added = 0;
     }
 
@@ -533,10 +507,12 @@ pub fn vterminal_new_lisp(
         (*term).height = rows;
         (*term).height_resize = 0;
 
-        //        emacs_value newline = env->make_string(env, "\n", 1);
-        // for (int i = 0; i < term->height; i++) {
-        //   insert(env, newline);
-        // }
+        let mut newline = make_string("\n".as_ptr() as *mut c_char, 1);
+        let mut i = 0;
+        while i < (*term).height {
+            Finsert(1, &mut newline);
+            i += 1;
+        }
 
         (*term).linenum = 0;
         (*term).linenum = (*term).height as i64;
@@ -701,26 +677,6 @@ pub fn vterminal_delete_lines(linenum: EmacsInt, count: LispObject) {
         }
         set_point(cmp::min(orig_pt, cur_buf.zv))
     };
-}
-
-/// Count lines in current buffer.
-#[lisp_fn]
-pub fn vterminal_count_lines() -> i32 {
-    unsafe {
-        let cur_buf = ThreadState::current_buffer_unchecked();
-        let orig_pt = cur_buf.pt;
-        set_point(cur_buf.beg());
-        let mut count: i32 = 0;
-        let regexp = make_string("\n".as_ptr() as *mut c_char, 1);
-        while !search_command(regexp, Qnil, Qt, LispObject::from(1), 1, 0, false).is_nil() {
-            count += 1;
-        }
-        if !(cur_buf.pt == cur_buf.begv || cur_buf.fetch_byte(cur_buf.pt_byte - 1) == b'\n') {
-            count += 1;
-        }
-        set_point(orig_pt);
-        count
-    }
 }
 
 /// Return process of terminal VTERM
