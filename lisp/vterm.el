@@ -22,7 +22,7 @@
                  (const :tag "Pop to buffer." 'pop-to-buffer))
   :group 'vterm)
 
-(defcustom vterm-max-scrollback 1000
+(defcustom vterm-max-scrollback 100000
   "Maximum 'scrollback' value."
   :type 'number
   :group 'vterm)
@@ -269,7 +269,7 @@ Argument INDEX index of color."
   (setq-local scroll-conservatively 101)
   (setq-local scroll-margin 0)
   
-  ;; (add-hook 'window-size-change-functions #'vterm-resize-window t t)
+  (add-hook 'window-size-change-functions #'vterm-resize-window t t)
   )
 
 (defun vterm-filter (process output)
@@ -438,7 +438,7 @@ Optional argument PASTE-P paste-p."
     (when (or arg (not (get-buffer-process buffer)))
       (with-current-buffer buffer
         (vterm-mode)))
-    ;; (vterm-resize-window (selected-frame))
+    (vterm-resize-window (selected-frame))
     (funcall vterm-display-method buffer)))
 
 (defun vterm-set-directory (path)
@@ -479,6 +479,45 @@ if LINE-NUM is negative backward-line from end of buffer.
       (when (and delete-whole-line
                  (looking-at "\n"))
         (delete-char 1)))))
+
+
+
+
+
+
+(defvar-local vterm--redraw-timer nil)
+
+(defvar vterm-timer-delay 0.05
+  "Delay for refreshing the buffer after receiving updates from libvterm.
+Improves performance when receiving large bursts of data.
+If nil, never delay")
+
+(defun vterm--invalidate()
+  "The terminal buffer is invalidated, the buffer needs redrawing."
+  (if vterm-timer-delay
+      (unless vterm--redraw-timer
+        (setq vterm--redraw-timer
+              (run-with-timer vterm-timer-delay nil
+                              #'vterm--delayed-redraw (current-buffer))))
+    (vterm--delayed-redraw (current-buffer))))
+
+(defun vterm--delayed-redraw(buffer)
+  "Redraw the terminal buffer .
+Argument BUFFER the terminal buffer."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((inhibit-redisplay t)
+            (inhibit-read-only t))
+        (setq vterm--redraw-timer nil)
+        (when vterm--term
+          (when (and (require 'display-line-numbers nil 'noerror)
+                     (get-buffer-window buffer t)
+                     (ignore-errors (display-line-numbers-update-width)))
+            (window--adjust-process-windows))
+          (vterminal-redraw vterm--term))))))
+
+
+
 
 (provide 'vterm)
 ;;; vterm.el ends here
