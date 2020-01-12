@@ -228,6 +228,12 @@ Argument INDEX index of color."
 (defvar-local vterm--process nil
   "Shell process of current term.")
 
+
+(defcustom vterm-term-environment-variable "xterm-256color"
+  "TERM value for terminal."
+  :type 'string
+  :group 'vterm)
+
 (define-derived-mode vterm-mode fundamental-mode "VTerm"
   "Major mode for vterm buffer."
   (buffer-disable-undo)
@@ -235,14 +241,16 @@ Argument INDEX index of color."
         (height (window-body-height))
         (width (window-body-width))
         proc
-        (scrollback (- vterm-max-scrollback 61)))
-    (let ((process-environment (append '("TERM=xterm-256color"
-                                         "INSIDE_EMACS=vterm"
-                                         "LINES"
-                                         "COLUMNS")
-                                       process-environment))
-          ;; (process-adaptive-read-buffering nil))
-          )
+        (scrollback vterm-max-scrollback)
+        ;; (scrollback (- vterm-max-scrollback 61))
+        )
+    (let ((process-environment (append `(,(concat "TERM="
+						                        vterm-term-environment-variable)
+                                       "INSIDE_EMACS=vterm"
+                                       "LINES"
+                                       "COLUMNS")
+                                     process-environment))
+        (process-adaptive-read-buffering nil))
       (setq proc (make-process
                   :name "vterm"
                   :buffer buf
@@ -260,7 +268,8 @@ Argument INDEX index of color."
   (setq buffer-read-only t)
   (setq-local scroll-conservatively 101)
   (setq-local scroll-margin 0)
-  (add-hook 'window-size-change-functions #'vterm-resize-window t t)
+  
+  ;; (add-hook 'window-size-change-functions #'vterm-resize-window t t)
   )
 
 (defun vterm-filter (process output)
@@ -429,7 +438,7 @@ Optional argument PASTE-P paste-p."
     (when (or arg (not (get-buffer-process buffer)))
       (with-current-buffer buffer
         (vterm-mode)))
-    (vterm-resize-window (selected-frame))
+    ;; (vterm-resize-window (selected-frame))
     (funcall vterm-display-method buffer)))
 
 (defun vterm-set-directory (path)
@@ -447,6 +456,29 @@ Optional argument PASTE-P paste-p."
             (setq default-directory (concat "/-:" path)))))
     (when (file-directory-p path)
       (setq default-directory path))))
+
+(defun vterm--goto-line(n)
+  "Go to line N and return true on success.
+if N is negative backward-line from end of buffer."
+  (cond
+   ((> n 0)
+    (goto-char (point-min))
+    (eq 0 (forward-line (1- n))))
+   (t
+    (goto-char (point-max))
+    (eq 0 (forward-line n)))))
+
+(defun vterm--delete-lines (line-num count &optional delete-whole-line)
+  "Delete COUNT lines from LINE-NUM.
+if LINE-NUM is negative backward-line from end of buffer.
+ If option DELETE-WHOLE-LINE is non-nil, then this command kills
+ the whole line including its terminating newline"
+  (save-excursion
+    (when (vterm--goto-line line-num)
+      (delete-region (point) (point-at-eol count))
+      (when (and delete-whole-line
+                 (looking-at "\n"))
+        (delete-char 1)))))
 
 (provide 'vterm)
 ;;; vterm.el ends here

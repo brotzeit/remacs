@@ -1,3 +1,4 @@
+
 //! libvterm facilities
 
 use remacs_macros::lisp_fn;
@@ -13,11 +14,11 @@ use crate::{
     lisp::LispObject,
     obarray::intern,
     remacs_sys::{
-        call1, code_convert_string_norecord, del_range, looking_at_1, make_string, pvec_type,
-        send_process, vterminal, EmacsInt, Fforward_char, Fget_buffer_window, Finsert, Flength,
-        Fline_end_position, Fpoint, Fput_text_property, Fselected_window, Fset, Fset_window_point,
-        Lisp_Type, Qbold, Qcursor_type, Qface, Qitalic, Qnil, Qnormal, Qt, Qterminal_live_p,
-        Qutf_8, STRING_BYTES,
+        call1, call2, call3, code_convert_string_norecord, del_range, looking_at_1, make_string,
+        pvec_type, send_process, vterminal, EmacsInt, Fforward_char, Fget_buffer_window, Finsert,
+        Flength, Fline_end_position, Fpoint, Fput_text_property, Fselected_window, Fset,
+        Fset_window_point, Lisp_Type, Qbold, Qcursor_type, Qface, Qitalic, Qnil, Qnormal, Qt,
+        Qterminal_live_p, Qutf_8, STRING_BYTES,
     },
 
     remacs_sys::{
@@ -271,19 +272,28 @@ unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
     (*term).invalid_end = cmp::min((*term).invalid_end, (*term).height);
 
     if (*term).invalid_end >= (*term).invalid_start {
-        let startrow = (*term).height - (*term).invalid_start - (*term).linenum_added as i32;
-        /* startrow is negative,so we backward  -startrow lines from end of buffer
-          then delete lines there.
-        */
-        vterminal_goto_line(startrow as EmacsInt);
-
-        // let line_count = (*term).invalid_end - (*term).invalid_start;
-        vterminal_delete_lines(
-            startrow as EmacsInt,
-            LispObject::from((*term).invalid_end as EmacsInt - (*term).invalid_start as EmacsInt),
+        let startrow = -((*term).height - (*term).invalid_start - (*term).linenum_added as i32);
+        // startrow is negative,so we backward  -startrow lines from end of buffer
+        // then delete lines there.
+        // vterminal_goto_line(startrow as EmacsInt);
+        call1(
+            LispObject::from(intern("vterm--goto-line")),
+            LispObject::from(startrow),
         );
+        // vterminal_delete_lines(
+        //     startrow as EmacsInt,
+        //     LispObject::from((*term).invalid_end - (*term).invalid_start),
+        // );
+        call3(
+            LispObject::from(intern("vterm--delete-lines")),
+            LispObject::from(startrow as EmacsInt),
+            LispObject::from((*term).invalid_end as EmacsInt - (*term).invalid_start as EmacsInt),
+            LispObject::from(Qt),
+        );
+
         term.refresh_lines((*term).invalid_start, (*term).invalid_end, (*term).width);
 
+        /* term->linenum_added is lines added  by window height increased */
         (*term).linenum += (*term).linenum_added;
         (*term).linenum_added = 0;
     }
@@ -295,7 +305,6 @@ unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef) {
     let state: *mut VTermState = vterm_obtain_state((*term).vt);
 
     let pos: VTermPos = term.get_cursorpos();
-
 
     /* pos.row-term->height is negative,so we backward term->height-pos.row
      * lines from end of buffer
@@ -339,8 +348,7 @@ unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
         // pending scrollback row into a string and append it just above the visible
         // section of the buffer
 
-        del_cnt = (*term).linenum - (*term).height - (*term).sb_size as i32
-            + (*term).sb_pending
+        del_cnt = (*term).linenum - (*term).height - (*term).sb_size as i32 + (*term).sb_pending
             - (*term).sb_pending_by_height_decr;
 
         if del_cnt > 0 {
@@ -364,7 +372,7 @@ unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
 
     // Remove extra lines at the bottom
 
-    del_cnt = (*term).linenum - max_line_count as i64;
+    del_cnt = (*term).linenum - max_line_count;
     if del_cnt > 0 {
         (*term).linenum -= del_cnt;
         /* -del_cnt is negative,so we delete_lines from end of buffer.
@@ -453,16 +461,11 @@ unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
     if vterm.is_invalidated {
         let oldlinenum = (*vterm).linenum;
 
-        vterminal_refresh_scrollback(vterm);
+        // vterminal_refresh_scrollback(vterm);
         vterminal_refresh_screen(vterm);
         (*vterm).linenum_added = (*vterm).linenum - oldlinenum;
         // vterminal_adjust_topline(vterm);
-        (*vterm).linenum_added = 0;
-    }
-
-    if (*vterm).directory_changed {
-        let dir = make_string((*vterm).directory, strlen((*vterm).directory) as isize);
-        call1(LispObject::from(intern("vterm-set-directory")), dir);
+        // (*vterm).linenum_added = 0;
     }
 
     vterm.is_invalidated = false;
@@ -514,12 +517,11 @@ pub fn vterminal_new_lisp(
             i += 1;
         }
 
-        (*term).linenum = 0;
-        (*term).linenum = (*term).height as i64;
+        (*term).linenum = (*term).height;
         (*term).linenum_added = 0;
 
-        (*term).directory = std::mem::zeroed();
-        (*term).directory_changed = false;
+        // (*term).directory = std::mem::zeroed();
+        // (*term).directory_changed = false;
 
         (*term).buffer = LispObject::from(ThreadState::current_buffer_unchecked());
         (*term).process = process;
@@ -648,10 +650,9 @@ pub fn vterminal_set_size_lisp(mut vterm: LispVterminalRef, rows: i32, cols: i32
     unsafe {
         if cols != (*vterm).width || rows != (*vterm).height {
             (*vterm).height_resize = rows - (*vterm).height;
-            if (rows > (*vterm).height) {
+            if rows > (*vterm).height {
                 if rows - (*vterm).height > (*vterm).sb_current as i32 {
-                    (*vterm).linenum_added =
-                        rows as i64 - (*vterm).height as i64 - (*vterm).sb_current as i64;
+                    (*vterm).linenum_added = rows - (*vterm).height - (*vterm).sb_current as i32;
                 }
             }
             vterm.set_size(rows, cols);
@@ -675,7 +676,8 @@ pub fn vterminal_delete_lines(linenum: EmacsInt, count: LispObject) {
         if !looking_at_1(make_string("\n".as_ptr() as *mut c_char, 1), false).is_nil() {
             del_range(pos, pos + 1);
         }
-        set_point(cmp::min(orig_pt, cur_buf.zv))
+        // set_point(cmp::min(orig_pt, cur_buf.zv))
+        set_point(orig_pt)
     };
 }
 
@@ -766,5 +768,55 @@ pub unsafe extern "C" fn vterminal_resize(
 // pub extern "C" fn rust_syms_of_vterm() {
 //     def_lisp_sym!(Qvtermp, "vtermp");
 // }
+
+#[lisp_fn]
+pub fn vterminal_linenum(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).linenum)
+}
+
+#[lisp_fn]
+pub fn vterminal_linenum_added(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).linenum_added)
+}
+
+#[lisp_fn]
+pub fn vterminal_height(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).height)
+}
+
+#[lisp_fn]
+pub fn vterminal_width(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).width)
+}
+
+#[lisp_fn]
+pub fn vterminal_sb_current(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).sb_current as i32)
+}
+
+#[lisp_fn]
+pub fn vterminal_sb_size(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).sb_size as i32)
+}
+
+#[lisp_fn]
+pub fn vterminal_sb_pending(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).sb_pending)
+}
+
+#[lisp_fn]
+pub fn vterminal_sb_pending_by_height_decr(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).sb_pending_by_height_decr)
+}
+
+#[lisp_fn]
+pub fn vterminal_cursor_row(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).cursor.row)
+}
+
+#[lisp_fn]
+pub fn vterminal_cursor_col(vterm: LispVterminalRef) -> LispObject {
+    LispObject::from((*vterm).cursor.col)
+}
 
 include!(concat!(env!("OUT_DIR"), "/vterm_exports.rs"));
