@@ -15,7 +15,7 @@ use crate::{
     obarray::intern,
     remacs_sys::{
         call1, call2, call3, code_convert_string_norecord, del_range, looking_at_1, make_string,
-        pvec_type, send_process, vterminal, EmacsInt, Fforward_char, Fget_buffer_window, Finsert,
+        pvec_type, send_process, vterminal, EmacsInt, Fforward_char, Fget_buffer_window, Finsert, 
         Flength, Fline_end_position, Fpoint, Fput_text_property, Fselected_window, Fset,
         Fset_window_point, Lisp_Type, Qbold, Qcursor_type, Qface, Qitalic, Qnil, Qnormal, Qt,
         Qterminal_live_p, Qutf_8, STRING_BYTES,
@@ -129,20 +129,20 @@ impl LispVterminalRef {
         let mut i = start_row;
         while i < end_row {
             let mut j = 0;
+            
             while j < end_col {
                 let cell = self.fetch_cell(i, j);
 
-                // if cell attributes are not equal to last cell, insert text
+                // if cell attributes are not equal to last cell, insert contents of vector v
                 if !cell.compare(lastcell) {
                     vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
 
                     size -= length;
-                    // use vector with update size
+                    // use vector with updated size
                     v = Vec::with_capacity(size as usize);
                     length = 0;
                 }
 
-                // only check once where eol is -> not needed to be called multiple times
                 lastcell = cell;
                 if cell.chars[0] == 0 {
                     if self.is_eol(end_col, i, j) {
