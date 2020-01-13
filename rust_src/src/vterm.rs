@@ -365,7 +365,7 @@ unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
             (*term).linenum -= del_cnt;
         }
 
-        (*term).linenum = (*term).sb_pending;
+        (*term).linenum += (*term).sb_pending;
         del_cnt = (*term).linenum - max_line_count; /* extra lines at the bottom */
         /* buf_index is negative,so we move to end of buffer,then backward
         -buf_index lines. goto lines backward is effectively when

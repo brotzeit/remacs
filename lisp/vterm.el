@@ -241,9 +241,8 @@ Argument INDEX index of color."
         (height (window-body-height))
         (width (window-body-width))
         proc
-        (scrollback vterm-max-scrollback)
-        ;; (scrollback (- vterm-max-scrollback 61))
-        )
+        ;; scrollback works only correctly with this ???
+        (scrollback (- vterm-max-scrollback 61)))
     (let ((process-environment (append `(,(concat "TERM="
 						                        vterm-term-environment-variable)
                                        "INSIDE_EMACS=vterm"
