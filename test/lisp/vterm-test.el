@@ -47,3 +47,42 @@
     (sit-for 0.2)
     (should (= (line-beginning-position) (point-min))))
   (vterm-kill))
+
+(defun test-eol ()
+  (interactive)
+  (vterm)
+  (sit-for 0.2)
+  (should (vterminal-is-eol vterm--term))
+      (dotimes (i 50)
+      (vterm-send-string (format "echo %d;history -d $(history 1)" i))
+      (vterm-send-key "<return>")
+      (sit-for 0.2))
+  (should (vterminal-is-eol vterm--term))
+  (vterm-kill)
+
+  (vterm)
+  (sit-for 0.2)
+  (vterm-send-string (format "echo 'test is eol'"))
+  (should (vterminal-is-eol vterm--term))
+  (vterm-send-key "<left>")
+  (sit-for 0.2)
+  (should (not (vterminal-is-eol vterm--term)))
+  (sit-for 0.2))
+
+(defun vterm-run-tests ()
+      (test-insertion)
+      (test-scrollback)
+      (test-clear-scrollback)
+      ;; (test-count-lines)
+      (test-eol)
+    )
+
+
+
+
+
+
+
+
+
+

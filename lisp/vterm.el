@@ -22,7 +22,7 @@
                  (const :tag "Pop to buffer." 'pop-to-buffer))
   :group 'vterm)
 
-(defcustom vterm-max-scrollback 100000
+(defcustom vterm-max-scrollback 1000
   "Maximum 'scrollback' value."
   :type 'number
   :group 'vterm)
@@ -479,11 +479,6 @@ if LINE-NUM is negative backward-line from end of buffer.
                  (looking-at "\n"))
         (delete-char 1)))))
 
-
-
-
-
-
 (defvar-local vterm--redraw-timer nil)
 
 (defvar vterm-timer-delay 0.05
@@ -515,8 +510,6 @@ Argument BUFFER the terminal buffer."
             (window--adjust-process-windows))
           (vterminal-redraw vterm--term))))))
 
-
-
-
 (provide 'vterm)
 ;;; vterm.el ends here
+

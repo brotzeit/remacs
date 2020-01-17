@@ -34,7 +34,7 @@ use crate::{
         vterm_screen_flush_damage, vterm_screen_is_eol, vterm_screen_reset,
         vterm_screen_set_damage_merge, vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos,
         vterm_state_set_unrecognised_fallbacks, VTermDamageSize, VTermKey, VTermModifier, VTermPos,
-        VTermProp, VTermRect, VTermScreenCell, VTermState, VTermValue,
+        VTermProp, VTermRect, VTermScreenCell, VTermState, VTermValue,VTermColor, vterm_screen_get_cell, vterm_state_get_default_colors
     },
 
     threads::ThreadState,
@@ -99,6 +99,7 @@ impl LispVterminalRef {
         }
     }
 
+    /// Return cursor position as VTermPos
     pub unsafe fn get_cursorpos(self) -> VTermPos {
         let state: *mut VTermState = vterm_obtain_state((*self).vt);
         let mut pos: VTermPos = std::mem::zeroed();
@@ -113,10 +114,15 @@ impl LispVterminalRef {
         cell
     }
 
+    // TODO: this function shouldn't exist on vterminal type
+    //
     pub unsafe fn is_eol(mut self, end_col: i32, row: i32, col: i32) -> bool {
         is_eol(self.as_mut(), end_col, row, col)
+        // myis_eol(self, end_col, row, col)
     }
 
+    // TODO: remove end_col and get value inside of this method
+    /// Refresh lines from START_ROW to END_ROW.
     pub unsafe fn refresh_lines(mut self, start_row: i32, end_row: i32, end_col: i32) {
         let mut size = ((end_row - start_row + 1) * end_col) * 4;
         let mut v: Vec<c_char> = Vec::with_capacity(size as usize);
@@ -135,10 +141,6 @@ impl LispVterminalRef {
                 // if cell attributes are not equal to last cell, insert contents of vector v
                 if !cell.compare(lastcell) {
                     vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
-
-                    size -= length;
-                    // use new vector with updated size
-                    v = Vec::with_capacity(size as usize);
                     length = 0;
                 }
 
@@ -148,14 +150,14 @@ impl LispVterminalRef {
                         /* This cell is EOL if this and every cell to the right is black */
                         break;
                     }
-
-                    v.push(' ' as c_char);
+                    
+                    v.insert(length as usize, ' ' as c_char);
                     length += 1;
                 } else {
                     let mut bytes: [c_uchar; 4] = std::mem::zeroed();
                     let size = cell.to_utf8(&mut bytes);
                     for n in 0..size {
-                        v.push(bytes[n] as c_char);
+                        v.insert(length as usize, bytes[n] as c_char);
                     }
                     length += size as i32;
                 }
@@ -690,29 +692,31 @@ pub fn vterminal_set_size_lisp(mut vterm: LispVterminalRef, rows: i32, cols: i32
     }
 }
 
-/// Delete COUNT lines starting from LINENUM.
-#[lisp_fn]
-pub fn vterminal_delete_lines(linenum: EmacsInt, count: LispObject) {
-    unsafe {
-        let cur_buf = ThreadState::current_buffer_unchecked();
-        let orig_pt = cur_buf.pt;
-        // vterminal_goto_line(linenum);
-        call1(
-            LispObject::from(intern("vterm--goto-line")),
-            LispObject::from(linenum),
-        );
+// // TODO: try to avoid goto-line and just del_range
+// /// Delete COUNT lines starting from LINENUM.
+// #[lisp_fn]
+// pub fn vterminal_delete_lines(linenum: EmacsInt, count: LispObject) {
+//     unsafe {
+//         // let cur_buf = ThreadState::current_buffer_unchecked();
+//         // let orig_pt = cur_buf.pt;
+//         // // vterminal_goto_line(linenum);
+//         // call1(
+//         //     LispObject::from(intern("vterm--goto-line")),
+//         //     LispObject::from(linenum),
+//         // );
 
-        let start = cur_buf.pt;
-        let end = EmacsInt::from(Fline_end_position(count)) as isize;
-        del_range(start, end);
-        let pos = cur_buf.pt;
-        if !looking_at_1(make_string("\n".as_ptr() as *mut c_char, 1), false).is_nil() {
-            del_range(pos, pos + 1);
-        }
-        // set_point(cmp::min(orig_pt, cur_buf.zv))
-        set_point(orig_pt)
-    };
-}
+//         // let start = cur_buf.pt;
+//         // let end = EmacsInt::from(Fline_end_position(count)) as isize;
+//         // del_range(start, end);
+//         // let pos = cur_buf.pt;
+//         // if !looking_at_1(make_string("\n".as_ptr() as *mut c_char, 1), false).is_nil() {
+//         //     del_range(pos, pos + 1);
+//         // }
+//         // // set_point(cmp::min(orig_pt, cur_buf.zv))
+//         // set_point(orig_pt)
+//         del_range(start, end);
+//     };
+// }
 
 /// Return process of terminal VTERM
 #[lisp_fn(name = "vterm-process")]
@@ -850,6 +854,14 @@ pub fn vterminal_cursor_row(vterm: LispVterminalRef) -> LispObject {
 #[lisp_fn]
 pub fn vterminal_cursor_col(vterm: LispVterminalRef) -> LispObject {
     LispObject::from((*vterm).cursor.col)
+}
+
+#[lisp_fn]
+pub fn vterminal_is_eol(vterm: LispVterminalRef) -> LispObject {
+    unsafe {
+        let pos = vterm.get_cursorpos();
+        LispObject::from(vterm.is_eol((*vterm).width, pos.row, pos.col))
+    }
 }
 
 include!(concat!(env!("OUT_DIR"), "/vterm_exports.rs"));
