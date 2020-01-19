@@ -69,20 +69,72 @@
   (should (not (vterminal-is-eol vterm--term)))
   (sit-for 0.2))
 
+(defun test-cursor-pos ()
+  (interactive)
+  (vterm)
+  (sit-for 0.2)
+  (let ((pos (vterminal-test-cursor-pos vterm--term)))
+    (should (= (car pos) (vterminal-cursor-row vterm--term)))
+    (should (= (cdr pos) (vterminal-cursor-col vterm--term))))
+  (vterm-send-key "<return>")
+  (sit-for 0.2)
+  (let ((pos (vterminal-test-cursor-pos vterm--term)))
+    (should (= (car pos) (vterminal-cursor-row vterm--term)))
+    (should (= (cdr pos) (vterminal-cursor-col vterm--term))))
+  (vterm-send-string (format "echo 'test cursorpos'"))
+  (vterm-send-key "<left>")
+  (sit-for 0.2)
+  (let ((pos (vterminal-test-cursor-pos vterm--term)))
+    (should (= (car pos) (vterminal-cursor-row vterm--term)))
+    (should (= (cdr pos) (vterminal-cursor-col vterm--term))))
+  (vterm-kill))
+
 (defun vterm-run-tests ()
       (test-insertion)
       (test-scrollback)
       (test-clear-scrollback)
       ;; (test-count-lines)
       (test-eol)
+      (test-cursor-pos)
     )
 
 
 
 
+(defun test-fetch-cell ()
+  (interactive)
+  
+  )
 
 
 
+(defun test-line-contents ()
+  (vterm)
+  (sit-for 0.2)
+  (dotimes (i 1)
+    (vterm-send-string (format "echo %d;history -d $(history 1)" i))
+    (vterm-send-key "<return>")
+    (sit-for 0.2))
+  (print (vterminal-line-contents vterm--term 0 0 30))
+  
+  
+  ;; (vterm-kill)
+  )
 
+
+
+(defun test-line-contents ()
+  (interactive)
+  ;; (vterm)
+  ;; (sit-for 0.2)
+  ;; (dotimes (i 1)
+  ;;   (vterm-send-string (format "echo %d;history -d $(history 1)" i))
+  ;;   (vterm-send-key "<return>")
+  ;;   (sit-for 0.2))
+  (print (vterminal-line-contents vterm--term 1 1 (vterminal-width vterm--term)))
+  
+  
+  ;; (vterm-kill)
+  )
 
 

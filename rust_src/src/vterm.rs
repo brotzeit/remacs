@@ -31,10 +31,11 @@ use crate::{
         vterm_color_is_equal, vterm_input_write, vterm_keyboard_end_paste, vterm_keyboard_key,
         vterm_keyboard_start_paste, vterm_keyboard_unichar, vterm_new, vterm_obtain_screen,
         vterm_obtain_state, vterm_output_get_buffer_current, vterm_screen_enable_altscreen,
-        vterm_screen_flush_damage, vterm_screen_is_eol, vterm_screen_reset,
+        vterm_screen_flush_damage, vterm_screen_get_cell, vterm_screen_is_eol, vterm_screen_reset,
         vterm_screen_set_damage_merge, vterm_set_size, vterm_set_utf8, vterm_state_get_cursorpos,
-        vterm_state_set_unrecognised_fallbacks, VTermDamageSize, VTermKey, VTermModifier, VTermPos,
-        VTermProp, VTermRect, VTermScreenCell, VTermState, VTermValue,VTermColor, vterm_screen_get_cell, vterm_state_get_default_colors
+        vterm_state_get_default_colors, vterm_state_set_unrecognised_fallbacks, VTermColor,
+        VTermDamageSize, VTermKey, VTermModifier, VTermPos, VTermProp, VTermRect, VTermScreenCell,
+        VTermState, VTermValue,
     },
 
     threads::ThreadState,
@@ -141,6 +142,11 @@ impl LispVterminalRef {
                 // if cell attributes are not equal to last cell, insert contents of vector v
                 if !cell.compare(lastcell) {
                     vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
+
+                    size -= length;
+                    // use new vector with updated size
+                    v = Vec::with_capacity(size as usize);
+
                     length = 0;
                 }
 
@@ -150,14 +156,16 @@ impl LispVterminalRef {
                         /* This cell is EOL if this and every cell to the right is black */
                         break;
                     }
-                    
-                    v.insert(length as usize, ' ' as c_char);
+
+                    // v.insert(length as usize, ' ' as c_char);
+                    v.push(' ' as c_char);
                     length += 1;
                 } else {
                     let mut bytes: [c_uchar; 4] = std::mem::zeroed();
                     let size = cell.to_utf8(&mut bytes);
                     for n in 0..size {
-                        v.insert(length as usize, bytes[n] as c_char);
+                        // v.insert(length as usize + n, bytes[n] as c_char);
+                        v.push(bytes[n] as c_char);
                     }
                     length += size as i32;
                 }
@@ -857,11 +865,76 @@ pub fn vterminal_cursor_col(vterm: LispVterminalRef) -> LispObject {
 }
 
 #[lisp_fn]
+pub fn vterminal_get_cursor_pos(vterm: LispVterminalRef) -> LispObject {
+    unsafe {
+        let pos = vterm.get_cursorpos();
+        LispObject::cons(pos.row, pos.col)
+    }
+}
+
+#[lisp_fn]
 pub fn vterminal_is_eol(vterm: LispVterminalRef) -> LispObject {
     unsafe {
         let pos = vterm.get_cursorpos();
         LispObject::from(vterm.is_eol((*vterm).width, pos.row, pos.col))
     }
 }
+
+#[lisp_fn]
+pub fn vterminal_line_contents(
+    vterm: LispVterminalRef,
+    start_row: i32,
+    end_row: i32,
+    end_col: i32,
+) -> LispObject {
+    unsafe {
+        let mut size = ((end_row - start_row + 1) * end_col) * 4;
+        let mut v: Vec<c_char> = Vec::with_capacity(size as usize);
+        let mut lastcell: VTermScreenCell = vterm.fetch_cell(start_row, 0);
+
+        let mut length = 0;
+
+        let mut i = start_row;
+        while i < end_row {
+            let mut j = 0;
+
+            while j < end_col {
+                let cell = vterm.fetch_cell(i, j);
+                lastcell = cell;
+                if cell.chars[0] == 0 {
+                    if vterm.is_eol(end_col, i, j) {
+                        /* This cell is EOL if this and every cell to the right is black */
+                        break;
+                    }
+
+                    // v.insert(length as usize, ' ' as c_char);
+                    v.push(' ' as c_char);
+                    length += 1;
+                } else {
+                    let mut bytes: [c_uchar; 4] = std::mem::zeroed();
+                    let size = cell.to_utf8(&mut bytes);
+                    for n in 0..size {
+                        // v.insert(length as usize + n, bytes[n] as c_char);
+                        v.push(' ' as c_char);
+                    }
+                    length += size as i32;
+                }
+
+                if cell.width > 1 {
+                    let w = cell.width - 1;
+                    j = j + w as i32;
+                }
+                j += 1;
+            }
+            v.push('\n' as c_char);
+            length += 1;
+            i += 1;
+        }
+        make_string(v.as_mut_ptr(), length as isize)
+    }
+}
+
+// insert 10 lines
+// grab lines with fetch_cell line by line
 
 include!(concat!(env!("OUT_DIR"), "/vterm_exports.rs"));
