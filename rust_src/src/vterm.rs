@@ -123,7 +123,7 @@ impl LispVterminalRef {
     }
 
     // TODO: cell and vterm don't need mut
-    /// This   
+    /// Make lisp string from c string and add properties
     pub unsafe fn make_propertized_string(
         mut self,
         buffer: *mut c_char,
@@ -133,7 +133,7 @@ impl LispVterminalRef {
         let mut text = make_string(buffer, len as isize);
 
         let start = LispObject::from(0);
-        let end = LispObject::from(EmacsInt::from(Flength(text)));
+        let end = Flength(text);
         let properties = list!(
             LispObject::from(intern(":foreground")),
             color_to_rgb_string(self.as_mut(), &mut (*cell).fg),
