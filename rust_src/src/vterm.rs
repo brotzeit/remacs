@@ -122,6 +122,55 @@ impl LispVterminalRef {
         // myis_eol(self, end_col, row, col)
     }
 
+    // TODO: cell and vterm don't need mut
+    /// This   
+    pub unsafe fn make_propertized_string(
+        mut self,
+        buffer: *mut c_char,
+        len: i32,
+        cell: *mut VTermScreenCell,
+    ) -> LispObject {
+        let mut text = make_string(buffer, len as isize);
+
+        let start = LispObject::from(0);
+        let end = LispObject::from(EmacsInt::from(Flength(text)));
+        let properties = list!(
+            LispObject::from(intern(":foreground")),
+            color_to_rgb_string(self.as_mut(), &mut (*cell).fg),
+            LispObject::from(intern(":background")),
+            color_to_rgb_string(self.as_mut(), &mut (*cell).bg),
+            LispObject::from(intern(":weight")),
+            if (*cell).attrs.bold() > 0 {
+                Qbold
+            } else {
+                Qnormal
+            },
+            LispObject::from(intern(":underline")),
+            if (*cell).attrs.underline() > 0 {
+                Qt
+            } else {
+                Qnil
+            },
+            LispObject::from(intern(":slant")),
+            if (*cell).attrs.italic() > 0 {
+                Qitalic
+            } else {
+                Qnormal
+            },
+            LispObject::from(intern(":inverse-video")),
+            if (*cell).attrs.reverse() > 0 {
+                Qt
+            } else {
+                Qnil
+            },
+            LispObject::from(intern(":strike-through")),
+            if (*cell).attrs.strike() > 0 { Qt } else { Qnil }
+        );
+
+        Fput_text_property(start, end, Qface, properties, text);
+        text
+    }
+
     // TODO: remove end_col and get value inside of this method
     /// Refresh lines from START_ROW to END_ROW.
     pub unsafe fn refresh_lines(mut self, start_row: i32, end_row: i32, end_col: i32) {
@@ -141,10 +190,14 @@ impl LispVterminalRef {
 
                 // if cell attributes are not equal to last cell, insert contents of vector v
                 if !cell.compare(lastcell) {
-                    vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
+                    if length > 0 {
+                        let mut t =
+                            self.make_propertized_string(v.as_mut_ptr(), length, &mut lastcell);
+                        Finsert(1, &mut t);
+                    }
 
                     size -= length;
-                    // use new vector with updated size
+                    // TODO: don't reset vector size
                     v = Vec::with_capacity(size as usize);
 
                     length = 0;
@@ -170,6 +223,7 @@ impl LispVterminalRef {
                     length += size as i32;
                 }
 
+                // TODO: this will only be changed for else from last conditional -> put it there
                 if cell.width > 1 {
                     let w = cell.width - 1;
                     j = j + w as i32;
@@ -182,7 +236,10 @@ impl LispVterminalRef {
             i += 1;
         }
 
-        vterminal_insert(self, v.as_mut_ptr(), length, &mut lastcell);
+        if length > 0 {
+            let mut t = self.make_propertized_string(v.as_mut_ptr(), length, &mut lastcell);
+            Finsert(1, &mut t);
+        }
     }
 }
 
@@ -412,56 +469,6 @@ unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
 
     (*term).sb_pending_by_height_decr = 0;
     (*term).height_resize = 0;
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn vterminal_insert(
-    mut vterm: LispVterminalRef,
-    buffer: *mut c_char,
-    len: i32,
-    cell: *mut VTermScreenCell,
-) {
-    if len > 0 {
-        let mut text = make_string(buffer, len as isize);
-
-        let start = LispObject::from(0);
-        let end = LispObject::from(EmacsInt::from(Flength(text)));
-        let properties = list!(
-            LispObject::from(intern(":foreground")),
-            color_to_rgb_string(vterm.as_mut(), &mut (*cell).fg),
-            LispObject::from(intern(":background")),
-            color_to_rgb_string(vterm.as_mut(), &mut (*cell).bg),
-            LispObject::from(intern(":weight")),
-            if (*cell).attrs.bold() > 0 {
-                Qbold
-            } else {
-                Qnormal
-            },
-            LispObject::from(intern(":underline")),
-            if (*cell).attrs.underline() > 0 {
-                Qt
-            } else {
-                Qnil
-            },
-            LispObject::from(intern(":slant")),
-            if (*cell).attrs.italic() > 0 {
-                Qitalic
-            } else {
-                Qnormal
-            },
-            LispObject::from(intern(":inverse-video")),
-            if (*cell).attrs.reverse() > 0 {
-                Qt
-            } else {
-                Qnil
-            },
-            LispObject::from(intern(":strike-through")),
-            if (*cell).attrs.strike() > 0 { Qt } else { Qnil }
-        );
-
-        Fput_text_property(start, end, Qface, properties, text);
-        Finsert(1, &mut text);
-    }
 }
 
 /// Send current contents of VTERM to the running shell process
@@ -911,6 +918,7 @@ pub fn vterminal_line_contents(
                     v.push(' ' as c_char);
                     length += 1;
                 } else {
+                    // make this a function
                     let mut bytes: [c_uchar; 4] = std::mem::zeroed();
                     let size = cell.to_utf8(&mut bytes);
                     for n in 0..size {

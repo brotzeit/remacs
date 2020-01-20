@@ -1,3 +1,5 @@
+;;; vterm-tests.el  -*- lexical-binding: t; -*-
+
 (defun vterm-kill ()
   (let ((proc (get-buffer-process vterm-buffer-name)))
     (kill-process proc)
@@ -20,6 +22,8 @@
       (forward-line 2)
       (setq c (+ c 1))))
   (vterm-kill))
+
+;; scrollback
 
 (defun test-scrollback ()
   (let ((vterm-max-scrollback 100))
@@ -47,6 +51,8 @@
     (sit-for 0.2)
     (should (= (line-beginning-position) (point-min))))
   (vterm-kill))
+
+;; cursor
 
 (defun test-eol ()
   (interactive)
