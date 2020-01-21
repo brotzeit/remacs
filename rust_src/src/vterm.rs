@@ -291,6 +291,24 @@ impl LispVterminalRef {
 
         self.is_invalidated = false;
     }
+
+    /// Send current contents of VTERM to the running shell process
+    pub unsafe fn flush_output(self) {
+        let len = vterm_output_get_buffer_current((*self).vt);
+        if len > 0 {
+            let mut buffer: Vec<c_char> = Vec::with_capacity(len);
+            let len = vterm_output_read((*self).vt, buffer.as_mut_ptr() as *mut c_char, len);
+
+            let lisp_string = make_string(buffer.as_mut_ptr() as *mut c_char, len as isize);
+
+            send_process(
+                (*self).process,
+                buffer.as_mut_ptr() as *mut c_char,
+                len as isize,
+                lisp_string,
+            );
+        }
+    }
 }
 
 pub unsafe fn vterminal_push_cell(v: &mut Vec<c_char>, cell: VTermScreenCell) -> i32 {
@@ -303,7 +321,7 @@ pub unsafe fn vterminal_push_cell(v: &mut Vec<c_char>, cell: VTermScreenCell) ->
 }
 
 impl VTermScreenCell {
-    ///  Convert contents of cell to utf8
+    /// Convert contents of cell to utf8 and write result in TO
     pub unsafe fn to_utf8(self, to: &mut [u8]) -> usize {
         let cp = self.chars[0];
 
@@ -351,7 +369,8 @@ impl VTermPos {
         vterm_screen_is_eol((*vterm).vts, self) > 0
     }
 
-    pub unsafe fn col_offset(self, vterm: LispVterminalRef) -> i32 {
+    /// Return offset in vterm
+    pub unsafe fn offset(self, vterm: LispVterminalRef) -> i32 {
         let mut offset: size_t = 0;
         let pos_col = self.col;
 
@@ -404,7 +423,7 @@ unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef) {
         LispObject::from(pos.row - (*term).height),
     );
 
-    let offset = pos.col_offset(term);
+    let offset = pos.offset(term);
 
     Fforward_char(LispObject::from(pos.col - offset as i32));
 
@@ -492,24 +511,6 @@ unsafe fn vterminal_refresh_scrollback(mut term: LispVterminalRef) {
 
     (*term).sb_pending_by_height_decr = 0;
     (*term).height_resize = 0;
-}
-
-/// Send current contents of VTERM to the running shell process
-unsafe fn vterminal_flush_output(vterm: LispVterminalRef) {
-    let len = vterm_output_get_buffer_current((*vterm).vt);
-    if len > 0 {
-        let mut buffer: Vec<c_char> = Vec::with_capacity(len);
-        let len = vterm_output_read((*vterm).vt, buffer.as_mut_ptr() as *mut c_char, len);
-
-        let lisp_string = make_string(buffer.as_mut_ptr() as *mut c_char, len as isize);
-
-        send_process(
-            (*vterm).process,
-            buffer.as_mut_ptr() as *mut c_char,
-            len as isize,
-            lisp_string,
-        );
-    }
 }
 
 #[lisp_fn(name = "vterminal-redraw")]
@@ -672,7 +673,7 @@ pub fn vterminal_update(
             }
         }
 
-        vterminal_flush_output(vterm);
+        vterm.flush_output();
         if (*vterm).is_invalidated {
             call0(LispObject::from(intern("vterm--invalidate")));
         }
