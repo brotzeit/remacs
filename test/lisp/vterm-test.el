@@ -1,6 +1,7 @@
 ;;; vterm-tests.el  -*- lexical-binding: t; -*-
 
 (defun vterm-kill ()
+  "Kill running vterm session."
   (let ((proc (get-buffer-process vterm-buffer-name)))
     (kill-process proc)
     (while (eq (process-status proc) 'run)
@@ -75,24 +76,37 @@
   (should (not (vterminal-is-eol vterm--term)))
   (sit-for 0.2))
 
+;; test if row and col is set correctly
 (defun test-cursor-pos ()
   (interactive)
   (vterm)
   (sit-for 0.2)
-  (let ((pos (vterminal-test-cursor-pos vterm--term)))
+  (let ((pos (vterminal-cursor-pos vterm--term)))
     (should (= (car pos) (vterminal-cursor-row vterm--term)))
     (should (= (cdr pos) (vterminal-cursor-col vterm--term))))
   (vterm-send-key "<return>")
   (sit-for 0.2)
-  (let ((pos (vterminal-test-cursor-pos vterm--term)))
+  (let ((pos (vterminal-cursor-pos vterm--term)))
     (should (= (car pos) (vterminal-cursor-row vterm--term)))
     (should (= (cdr pos) (vterminal-cursor-col vterm--term))))
   (vterm-send-string (format "echo 'test cursorpos'"))
   (vterm-send-key "<left>")
   (sit-for 0.2)
-  (let ((pos (vterminal-test-cursor-pos vterm--term)))
+  (let ((pos (vterminal-cursor-pos vterm--term)))
     (should (= (car pos) (vterminal-cursor-row vterm--term)))
     (should (= (cdr pos) (vterminal-cursor-col vterm--term))))
+  (vterm-kill))
+
+;; test contents of cell at point
+(defun test-fetch-cell ()
+  (interactive)
+  (vterm)
+  (sit-for 0.2)
+  (should (string= (vterminal-fetch-cell vterm--term) "\0"))
+  (vterm-send-key "ε")
+  (vterm-send-key "<left>")
+  (sit-for 0.2)
+  (should (string= (vterminal-fetch-cell vterm--term) "ε"))
   (vterm-kill))
 
 (defun vterm-run-tests ()
@@ -102,15 +116,14 @@
       ;; (test-count-lines)
       (test-eol)
       (test-cursor-pos)
+      (test-fetch-cell)
     )
 
+;; pending: raise timeout and check value
 
 
 
-(defun test-fetch-cell ()
-  (interactive)
-  
-  )
+
 
 
 
