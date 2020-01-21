@@ -273,25 +273,24 @@ impl LispVterminalRef {
         (*self).invalid_start = std::i32::MAX;
         (*self).invalid_end = -1;
     }
-}
 
+    /// Refresh cursor, scrollback and screen.
+    /// Also adjust the top line.
+    pub unsafe fn redraw(mut self) {
+        term_redraw_cursor(self.as_mut());
 
-/// Refresh cursor, scrollback and screen.
-/// Also adjust the top line.
-unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
-    term_redraw_cursor(vterm.as_mut());
+        if self.is_invalidated {
+            let oldlinenum = (*self).linenum;
 
-    if vterm.is_invalidated {
-        let oldlinenum = (*vterm).linenum;
+            vterminal_refresh_scrollback(self);
+            self.refresh_screen();
+            (*self).linenum_added = (*self).linenum - oldlinenum;
+            vterminal_adjust_topline(self);
+            (*self).linenum_added = 0;
+        }
 
-        vterminal_refresh_scrollback(vterm);
-        vterm.refresh_screen();
-        (*vterm).linenum_added = (*vterm).linenum - oldlinenum;
-        vterminal_adjust_topline(vterm);
-        (*vterm).linenum_added = 0;
+        self.is_invalidated = false;
     }
-
-    vterm.is_invalidated = false;
 }
 
 pub unsafe fn vterminal_push_cell(v: &mut Vec<c_char>, cell: VTermScreenCell) -> i32 {
@@ -516,7 +515,7 @@ unsafe fn vterminal_flush_output(vterm: LispVterminalRef) {
 #[lisp_fn(name = "vterminal-redraw")]
 pub fn vterminal_redraw_lisp(mut vterm: LispVterminalRef) {
     unsafe {
-        vterminal_redraw(vterm);
+        vterm.redraw();
     }
 }
 
@@ -708,7 +707,7 @@ pub fn vterminal_set_size_lisp(mut vterm: LispVterminalRef, rows: i32, cols: i32
             }
             vterm.set_size(rows, cols);
             vterm_screen_flush_damage((*vterm).vts);
-            vterminal_redraw(vterm);
+            vterm.redraw();
         }
     }
 }
