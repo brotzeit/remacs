@@ -210,11 +210,10 @@ impl LispVterminalRef {
                         break;
                     }
 
-                    // v.insert(length as usize, ' ' as c_char);
                     v.push(' ' as c_char);
                     length += 1;
                 } else {
-                    let size = vterminal_push_cell ( &mut v, cell);
+                    let size = vterminal_push_cell(&mut v, cell);
                     length += size;
                 }
 
@@ -236,13 +235,69 @@ impl LispVterminalRef {
             Finsert(1, &mut t);
         }
     }
+
+    /// Refresh the screen (visible part of the buffer when the terminal is focused)
+    /// of a invalidated terminal
+    pub unsafe fn refresh_screen(mut self) {
+        // Term height may have decreased before `invalid_end` reflects it.
+        (*self).invalid_end = cmp::min((*self).invalid_end, (*self).height);
+
+        if (*self).invalid_end >= (*self).invalid_start {
+            let startrow = -((*self).height - (*self).invalid_start - (*self).linenum_added as i32);
+            // startrow is negative,so we backward  -startrow lines from end of buffer
+            // then delete lines there.
+            // vterminal_goto_line(startrow as EmacsInt);
+            call1(
+                LispObject::from(intern("vterm--goto-line")),
+                LispObject::from(startrow),
+            );
+            // vterminal_delete_lines(
+            //     startrow as EmacsInt,
+            //     LispObject::from((*self).invalid_end - (*self).invalid_start),
+            // );
+            call3(
+                LispObject::from(intern("vterm--delete-lines")),
+                LispObject::from(startrow as EmacsInt),
+                LispObject::from(
+                    (*self).invalid_end as EmacsInt - (*self).invalid_start as EmacsInt,
+                ),
+                LispObject::from(Qt),
+            );
+
+            self.refresh_lines((*self).invalid_start, (*self).invalid_end, (*self).width);
+
+            // term->linenum_added is lines added by window height increased
+            (*self).linenum += (*self).linenum_added;
+            (*self).linenum_added = 0;
+        }
+        (*self).invalid_start = std::i32::MAX;
+        (*self).invalid_end = -1;
+    }
+}
+
+
+/// Refresh cursor, scrollback and screen.
+/// Also adjust the top line.
+unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
+    term_redraw_cursor(vterm.as_mut());
+
+    if vterm.is_invalidated {
+        let oldlinenum = (*vterm).linenum;
+
+        vterminal_refresh_scrollback(vterm);
+        vterm.refresh_screen();
+        (*vterm).linenum_added = (*vterm).linenum - oldlinenum;
+        vterminal_adjust_topline(vterm);
+        (*vterm).linenum_added = 0;
+    }
+
+    vterm.is_invalidated = false;
 }
 
 pub unsafe fn vterminal_push_cell(v: &mut Vec<c_char>, cell: VTermScreenCell) -> i32 {
     let mut bytes: [c_uchar; 4] = std::mem::zeroed();
     let size = cell.to_utf8(&mut bytes);
     for n in 0..size {
-        // v.insert(length as usize + n, bytes[n] as c_char);
         v.push(bytes[n] as c_char);
     }
     size as i32
@@ -334,42 +389,6 @@ macro_rules! allocate_zeroed_pseudovector {
 fn allocate_vterm() -> LispVterminalRef {
     let v: *mut vterminal = allocate_zeroed_pseudovector!(vterminal, vt, pvec_type::PVEC_VTERMINAL);
     LispVterminalRef::from_ptr(v as *mut c_void).unwrap()
-}
-
-/// Refresh the screen (visible part of the buffer when the terminal is focused)
-/// of a invalidated terminal
-unsafe fn vterminal_refresh_screen(mut term: LispVterminalRef) {
-    // Term height may have decreased before `invalid_end` reflects it.
-    (*term).invalid_end = cmp::min((*term).invalid_end, (*term).height);
-
-    if (*term).invalid_end >= (*term).invalid_start {
-        let startrow = -((*term).height - (*term).invalid_start - (*term).linenum_added as i32);
-        // startrow is negative,so we backward  -startrow lines from end of buffer
-        // then delete lines there.
-        // vterminal_goto_line(startrow as EmacsInt);
-        call1(
-            LispObject::from(intern("vterm--goto-line")),
-            LispObject::from(startrow),
-        );
-        // vterminal_delete_lines(
-        //     startrow as EmacsInt,
-        //     LispObject::from((*term).invalid_end - (*term).invalid_start),
-        // );
-        call3(
-            LispObject::from(intern("vterm--delete-lines")),
-            LispObject::from(startrow as EmacsInt),
-            LispObject::from((*term).invalid_end as EmacsInt - (*term).invalid_start as EmacsInt),
-            LispObject::from(Qt),
-        );
-
-        term.refresh_lines((*term).invalid_start, (*term).invalid_end, (*term).width);
-
-        /* term->linenum_added is lines added  by window height increased */
-        (*term).linenum += (*term).linenum_added;
-        (*term).linenum_added = 0;
-    }
-    (*term).invalid_start = std::i32::MAX;
-    (*term).invalid_end = -1;
 }
 
 unsafe fn vterminal_adjust_topline(mut term: LispVterminalRef) {
@@ -499,24 +518,6 @@ pub fn vterminal_redraw_lisp(mut vterm: LispVterminalRef) {
     unsafe {
         vterminal_redraw(vterm);
     }
-}
-
-/// Refresh cursor, scrollback and screen.
-/// Also adjust the top line.
-unsafe fn vterminal_redraw(mut vterm: LispVterminalRef) {
-    term_redraw_cursor(vterm.as_mut());
-
-    if vterm.is_invalidated {
-        let oldlinenum = (*vterm).linenum;
-
-        vterminal_refresh_scrollback(vterm);
-        vterminal_refresh_screen(vterm);
-        (*vterm).linenum_added = (*vterm).linenum - oldlinenum;
-        vterminal_adjust_topline(vterm);
-        (*vterm).linenum_added = 0;
-    }
-
-    vterm.is_invalidated = false;
 }
 
 /// Start a libvterm terminal-emulator in a new buffer.
