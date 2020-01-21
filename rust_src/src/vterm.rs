@@ -214,13 +214,8 @@ impl LispVterminalRef {
                     v.push(' ' as c_char);
                     length += 1;
                 } else {
-                    let mut bytes: [c_uchar; 4] = std::mem::zeroed();
-                    let size = cell.to_utf8(&mut bytes);
-                    for n in 0..size {
-                        // v.insert(length as usize + n, bytes[n] as c_char);
-                        v.push(bytes[n] as c_char);
-                    }
-                    length += size as i32;
+                    let size = vterminal_push_cell ( &mut v, cell);
+                    length += size;
                 }
 
                 // TODO: this will only be changed for else from last conditional -> put it there
@@ -241,6 +236,16 @@ impl LispVterminalRef {
             Finsert(1, &mut t);
         }
     }
+}
+
+pub unsafe fn vterminal_push_cell(v: &mut Vec<c_char>, cell: VTermScreenCell) -> i32 {
+    let mut bytes: [c_uchar; 4] = std::mem::zeroed();
+    let size = cell.to_utf8(&mut bytes);
+    for n in 0..size {
+        // v.insert(length as usize + n, bytes[n] as c_char);
+        v.push(bytes[n] as c_char);
+    }
+    size as i32
 }
 
 impl VTermScreenCell {
