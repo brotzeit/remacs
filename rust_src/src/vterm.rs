@@ -714,7 +714,6 @@ pub unsafe extern "C" fn vterminal_resize(
     1
 }
 
-// TODO: Make this work again
 // #[no_mangle]
 // pub extern "C" fn rust_syms_of_vterm() {
 //     def_lisp_sym!(Qvtermp, "vtermp");
